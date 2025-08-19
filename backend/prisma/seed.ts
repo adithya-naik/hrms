@@ -1,11 +1,13 @@
-import { PrismaClient, UserRole, LeaveType } from '@prisma/client';
+import { PrismaClient, UserRole, LeaveType, LeaveStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting database seeding...');
 
+  // ----------------------
   // Create departments
+  // ----------------------
   const departments = await Promise.all([
     prisma.department.create({
       data: {
@@ -35,7 +37,9 @@ async function main() {
 
   console.log('✅ Created departments');
 
+  // ----------------------
   // Create leave policies
+  // ----------------------
   const leavePolicies = await Promise.all([
     prisma.leavePolicy.create({
       data: {
@@ -110,7 +114,9 @@ async function main() {
 
   console.log('✅ Created leave policies');
 
+  // ----------------------
   // Create sample users
+  // ----------------------
   const admin = await prisma.user.create({
     data: {
       auth0Id: 'auth0|admin123',
@@ -193,7 +199,9 @@ async function main() {
 
   console.log('✅ Created sample users');
 
+  // ----------------------
   // Create leave balances for all users
+  // ----------------------
   const currentYear = new Date().getFullYear();
   const allUsers = [admin, hrManager, engineeringManager, ...employees];
 
@@ -202,7 +210,7 @@ async function main() {
       await prisma.leaveBalance.create({
         data: {
           userId: user.id,
-          leaveType: policy.leaveType,
+          leavePolicyId: policy.id, // updated
           year: currentYear,
           totalQuota: policy.annualQuota,
           usedDays: 0,
@@ -216,11 +224,13 @@ async function main() {
 
   console.log('✅ Created leave balances');
 
+  // ----------------------
   // Create sample holidays
+  // ----------------------
   const holidays = await Promise.all([
     prisma.holiday.create({
       data: {
-        name: 'New Year\'s Day',
+        name: "New Year's Day",
         date: new Date(`${currentYear}-01-01`),
         description: 'New Year celebration',
         isRecurring: true,
@@ -254,7 +264,9 @@ async function main() {
 
   console.log('✅ Created holidays');
 
+  // ----------------------
   // Create sample leave requests
+  // ----------------------
   const sampleLeaves = await Promise.all([
     prisma.leave.create({
       data: {
@@ -264,7 +276,7 @@ async function main() {
         endDate: new Date(`${currentYear}-12-22`),
         totalDays: 3,
         reason: 'Family vacation for Christmas',
-        status: 'PENDING',
+        status: LeaveStatus.PENDING,
       },
     }),
     prisma.leave.create({
@@ -276,7 +288,7 @@ async function main() {
         endDate: new Date(`${currentYear}-11-16`),
         totalDays: 2,
         reason: 'Flu symptoms',
-        status: 'APPROVED',
+        status: LeaveStatus.APPROVED,
         approvedDate: new Date(),
       },
     }),

@@ -3,10 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { config } from '@/config/config';
-import { errorHandler } from '@/middleware/errorHandler';
-import { routes } from '@/routes';
-import { logger } from '@/utils/logger';
+import { config } from './config/config';
+import { errorHandler } from './middleware/errorHandler';
+import { routes } from './routes';
+import { logger } from './utils/logger';
 import 'express-async-errors';
 import dotenv from 'dotenv';
 dotenv.config(); // Load .env variables

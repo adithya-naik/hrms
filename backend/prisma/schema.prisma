@@ -132,7 +132,7 @@ model Leave {
 model LeaveBalance {
   id              String      @id @default(cuid())
   userId          String
-  leaveType       LeaveType
+  leavePolicyId   String
   year            Int
   totalQuota      Int
   usedDays        Int         @default(0)
@@ -144,9 +144,9 @@ model LeaveBalance {
 
   // Relations
   user            User         @relation(fields: [userId], references: [id])
-  leavePolicy     LeavePolicy  @relation(fields: [leaveType], references: [leaveType])
+  leavePolicy     LeavePolicy  @relation(fields: [leavePolicyId], references: [id])
 
-  @@unique([userId, leaveType, year])
+  @@unique([userId, leavePolicyId, year])
   @@map("leave_balances")
 }
 
