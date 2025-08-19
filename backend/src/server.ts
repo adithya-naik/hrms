@@ -5,10 +5,12 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { config } from '@/config/config';
 import { errorHandler } from '@/middleware/errorHandler';
-import { authMiddleware } from '@/middleware/auth';
 import { routes } from '@/routes';
 import { logger } from '@/utils/logger';
 import 'express-async-errors';
+import dotenv from 'dotenv';
+dotenv.config(); // Load .env variables
+
 
 const app = express();
 
@@ -21,8 +23,8 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: 15 * 60 * 1000, 
+  max: 100 
 });
 app.use(limiter);
 

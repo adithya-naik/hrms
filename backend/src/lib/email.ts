@@ -1,17 +1,30 @@
+// email.ts
 import nodemailer from 'nodemailer';
+import { htmlToText } from 'html-to-text';
 import { config } from '@/config/config';
 import { logger } from '@/utils/logger';
 
-const transporter = nodemailer.createTransporter({
+// Create Nodemailer transporter
+const transporter = nodemailer.createTransport({
   host: config.SMTP_HOST,
   port: config.SMTP_PORT,
-  secure: false,
+  secure: config.SMTP_PORT === 465, // true for 465, false for 587
   auth: {
     user: config.SMTP_USER,
     pass: config.SMTP_PASS,
   },
 });
 
+// Verify transporter connection
+transporter.verify((error, success) => {
+  if (error) {
+    logger.error('SMTP connection failed:', error);
+  } else {
+    logger.info('SMTP Server is ready to send emails');
+  }
+});
+
+// Email options interface
 interface EmailOptions {
   to: string;
   subject: string;
@@ -19,6 +32,7 @@ interface EmailOptions {
   text?: string;
 }
 
+// Send email function
 export const sendEmail = async (options: EmailOptions): Promise<void> => {
   try {
     const mailOptions = {
@@ -26,11 +40,11 @@ export const sendEmail = async (options: EmailOptions): Promise<void> => {
       to: options.to,
       subject: options.subject,
       html: options.html,
-      text: options.text,
+      text: options.text || htmlToText(options.html), // fallback to plain text
     };
 
-    await transporter.sendMail(mailOptions);
-    logger.info(`Email sent successfully to ${options.to}`);
+    const info = await transporter.sendMail(mailOptions);
+    logger.info(`Email sent successfully to ${options.to} | Message ID: ${info.messageId}`);
   } catch (error) {
     logger.error('Email sending failed:', error);
     throw error;
@@ -68,7 +82,13 @@ export const emailTemplates = {
     `,
   }),
 
-  leaveRejected: (requesterName: string, leaveType: string, startDate: string, endDate: string, reason: string) => ({
+  leaveRejected: (
+    requesterName: string,
+    leaveType: string,
+    startDate: string,
+    endDate: string,
+    reason: string
+  ) => ({
     subject: 'Leave Request Rejected',
     html: `
       <h2>Leave Request Rejected</h2>

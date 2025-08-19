@@ -12,7 +12,7 @@ export { cloudinary };
 export const uploadToCloudinary = async (
   buffer: Buffer,
   filename: string,
-  folder: string = 'leave-documents'
+  folder: string
 ): Promise<{ url: string; publicId: string }> => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader.upload_stream(

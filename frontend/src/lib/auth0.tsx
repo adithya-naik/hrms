@@ -3,7 +3,6 @@ import { ReactNode } from "react";
 
 const domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
-const audience = import.meta.env.VITE_AUTH0_AUDIENCE;
 
 interface Auth0ProviderWrapperProps {
   children: ReactNode;
@@ -19,12 +18,14 @@ export const Auth0ProviderWrapper = ({ children }: Auth0ProviderWrapperProps) =>
       domain={domain}
       clientId={clientId}
       authorizationParams={{
-        redirect_uri: window.location.origin,
-        ...(audience ? { audience } : {}),
+       redirect_uri: window.location.origin,
+       audience: import.meta.env.VITE_AUTH0_AUDIENCE
       }}
-      cacheLocation="localstorage" // keeps user logged in on refresh
+      cacheLocation="localstorage" // keep user logged in after refresh
     >
       {children}
     </Auth0Provider>
   );
 };
+console.log("Auth0 domain:", domain);
+console.log("Auth0 clientId:", clientId);
