@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  EMPLOYEE
+  MANAGER
+  HR
+  ADMIN
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  VACATION
+  ACADEMIC
+  COMP_OFF
+  WFH
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  CANCEL
+}
+
+model User {
+  id              String   @id @default(cuid())
+  auth0Id         String   @unique
+  email           String   @unique
+  firstName       String
+  lastName        String
+  employeeId      String   @unique
+  role            UserRole @default(EMPLOYEE)
+  managerId       String?
+  departmentId    String?
+  isActive        Boolean  @default(true)
+  joinDate        DateTime
+  profileImage    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  manager         User?        @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees       User[]       @relation("ManagerEmployee")
+  department      Department?  @relation(fields: [departmentId], references: [id])
+  leaveRequests   Leave[]      @relation("LeaveRequester")
+  approvedLeaves  Leave[]      @relation("LeaveApprover")
+  leaveBalances   LeaveBalance[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  headId      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+
+  @@map("departments")
+}
+
+model LeavePolicy {
+  id                    String    @id @default(cuid())
+  leaveType             LeaveType
+  annualQuota           Int
+  maxConsecutiveDays    Int?
+  minDaysNotice         Int       @default(1)
+  requiresApproval      Boolean   @default(true)
+  requiresDocument      Boolean   @default(false)
+  carryForwardAllowed   Boolean   @default(false)
+  maxCarryForward       Int?
+  isActive              Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  leaveBalances         LeaveBalance[]
+
+  @@map("leave_policies")
+}
+
+model Leave {
+  id              String      @id @default(cuid())
+  requesterId     String
+  approverId      String?
+  leaveType       LeaveType
+  startDate       DateTime
+  endDate         DateTime
+  totalDays       Int
+  reason          String
+  status          LeaveStatus @default(PENDING)
+  appliedDate     DateTime    @default(now())
+  approvedDate    DateTime?
+  rejectionReason String?
+  attachments     String[]    @default([])
+  isHalfDay       Boolean     @default(false)
+  emergencyLeave  Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  requester       User        @relation("LeaveRequester", fields: [requesterId], references: [id])
+  approver        User?       @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  @@map("leaves")
+}
+
+model LeaveBalance {
+  id              String      @id @default(cuid())
+  userId          String
+  leaveType       LeaveType
+  year            Int
+  totalQuota      Int
+  usedDays        Int         @default(0)
+  pendingDays     Int         @default(0)
+  availableDays   Int
+  carryForward    Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  user            User         @relation(fields: [userId], references: [id])
+  leavePolicy     LeavePolicy  @relation(fields: [leaveType], references: [leaveType])
+
+  @@unique([userId, leaveType, year])
+  @@map("leave_balances")
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  description String?
+  isRecurring Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("holidays")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  leaveId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  userId      String
+  action      AuditAction
+  entityType  String
+  entityId    String
+  oldValues   Json?
+  newValues   Json?
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime    @default(now())
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
