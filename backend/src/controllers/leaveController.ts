@@ -1,11 +1,11 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { createError } from '@/middleware/errorHandler';
-import { AuthRequest } from '@/middleware/auth';
+import { prisma } from '../lib/prisma';
+import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 import { LeaveType, LeaveStatus, UserRole } from '@prisma/client';
-import { sendEmail, emailTemplates } from '@/lib/email';
-import { logger } from '@/utils/logger';
+import { sendEmail, emailTemplates } from '../lib/email';
+import { logger } from '../utils/logger';
 
 const createLeaveSchema = z.object({
   leaveType: z.nativeEnum(LeaveType),

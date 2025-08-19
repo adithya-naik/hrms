@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { leaveController } from '@/controllers/leaveController';
-import { authMiddleware, authorize } from '@/middleware/auth';
+import { leaveController } from '../controllers/leaveController';
+import { authMiddleware, authorize } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
