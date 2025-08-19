@@ -1,5 +1,5 @@
-import { Auth0Provider } from '@auth0/auth0-react';
-import { ReactNode } from 'react';
+import { Auth0Provider } from "@auth0/auth0-react";
+import { ReactNode } from "react";
 
 const domain = import.meta.env.VITE_AUTH0_DOMAIN;
 const clientId = import.meta.env.VITE_AUTH0_CLIENT_ID;
@@ -10,14 +10,19 @@ interface Auth0ProviderWrapperProps {
 }
 
 export const Auth0ProviderWrapper = ({ children }: Auth0ProviderWrapperProps) => {
+  if (!domain || !clientId) {
+    console.error("❌ Missing Auth0 environment variables. Check your .env file.");
+  }
+
   return (
     <Auth0Provider
       domain={domain}
       clientId={clientId}
       authorizationParams={{
         redirect_uri: window.location.origin,
-        audience: audience,
+        ...(audience ? { audience } : {}),
       }}
+      cacheLocation="localstorage" // keeps user logged in on refresh
     >
       {children}
     </Auth0Provider>
