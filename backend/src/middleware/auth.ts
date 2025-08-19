@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { jwtVerify, createRemoteJWKSet, JWTPayload } from 'jose';
-import { config } from '@/config/config';
-import { prisma } from '@/lib/prisma';
+import { config } from '../config/config';
+import { prisma } from '../lib/prisma';
 import { UserRole } from '@prisma/client';
 
 interface AuthRequest extends Request {

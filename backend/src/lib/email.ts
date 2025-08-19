@@ -1,8 +1,8 @@
 // email.ts
 import nodemailer from 'nodemailer';
 import { htmlToText } from 'html-to-text';
-import { config } from '@/config/config';
-import { logger } from '@/utils/logger';
+import { config } from '../config/config';
+import { logger } from '../utils/logger';
 
 // Create Nodemailer transporter
 const transporter = nodemailer.createTransport({

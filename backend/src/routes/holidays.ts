@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { holidayController } from '@/controllers/holidayController';
-import { authMiddleware, authorize } from '@/middleware/auth';
+import { holidayController } from '../controllers/holidayController';
+import { authMiddleware, authorize } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
 
 const router = Router();

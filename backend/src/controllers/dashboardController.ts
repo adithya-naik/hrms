@@ -1,6 +1,6 @@
 import { Response } from 'express';
-import { prisma } from '@/lib/prisma';
-import { AuthRequest } from '@/middleware/auth';
+import { prisma } from '../lib/prisma';
+import { AuthRequest } from '../middleware/auth';
 import { UserRole, LeaveStatus } from '@prisma/client';
 
 class DashboardController {

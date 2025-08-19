@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { uploadController } from '@/controllers/uploadController';
-import { authMiddleware } from '@/middleware/auth';
+import { uploadController } from '../controllers/uploadController';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 

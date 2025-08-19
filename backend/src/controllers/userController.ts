@@ -1,8 +1,8 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '@/lib/prisma';
-import { createError } from '@/middleware/errorHandler';
-import { AuthRequest } from '@/middleware/auth';
+import { prisma } from '../lib/prisma';
+import { createError } from '../middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
 
 const updateUserSchema = z.object({

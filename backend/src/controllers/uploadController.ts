@@ -1,7 +1,7 @@
 import { Response } from 'express';
-import { AuthRequest } from '@/middleware/auth';
-import { uploadToCloudinary, cloudinary } from '@/lib/cloudinary';
-import { createError } from '@/middleware/errorHandler';
+import { AuthRequest } from '../middleware/auth';
+import { uploadToCloudinary, cloudinary } from '../lib/cloudinary';
+import { createError } from '../middleware/errorHandler';
 
 class UploadController {
   // Upload leave documents (PDF, DOC, DOCX, JPG, PNG)
