@@ -27,10 +27,18 @@ const updateProfileSchema = z.object({
 });
 
 class AuthController {
+  constructor() {
+    this.login = this.login.bind(this);
+    this.register = this.register.bind(this);
+    this.getProfile = this.getProfile.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
+  }
+
   async login(req: Request, res: Response) {
     const { auth0Id, email } = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({
+    // Try to find user by auth0Id
+    let user = await prisma.user.findUnique({
       where: { auth0Id },
       include: {
         department: true,
@@ -45,14 +53,76 @@ class AuthController {
       },
     });
 
+    // If not found by auth0Id, try to find by email to avoid duplicates
     if (!user) {
-      throw createError('User not found', 404);
+      user = await prisma.user.findUnique({
+        where: { email },
+        include: {
+          department: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // If found by email but no auth0Id, update user with auth0Id
+      if (user) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { auth0Id },
+          include: {
+            department: true,
+            manager: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        });
+      }
+    }
+
+    // If no user found, create a new user
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          auth0Id,
+          email,
+          firstName: 'New',
+          lastName: 'User',
+          employeeId: 'EMP' + Math.floor(Math.random() * 100000),
+          role: 'EMPLOYEE',
+          joinDate: new Date(),
+          isActive: true,
+        },
+        include: {
+          department: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      await this.initializeLeaveBalances(user.id);
     }
 
     if (!user.isActive) {
       throw createError('Account is deactivated', 403);
     }
-
+console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
     res.json({
       user: {
         id: user.id,
@@ -103,7 +173,6 @@ class AuthController {
       },
     });
 
-    // Initialize leave balances for the new user
     await this.initializeLeaveBalances(user.id);
 
     res.status(201).json({

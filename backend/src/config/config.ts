@@ -34,7 +34,7 @@ export const config = {
   FROM_NAME: process.env.FROM_NAME!,
   
   // Application
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:3000'
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173'
 };
 
 // Validate required environment variables

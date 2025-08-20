@@ -22,6 +22,19 @@ const approveRejectSchema = z.object({
 });
 
 class LeaveController {
+  constructor() {
+    this.createLeave = this.createLeave.bind(this);
+    this.getLeaves = this.getLeaves.bind(this);
+    this.getLeaveBalances = this.getLeaveBalances.bind(this);
+    this.approveLeave = this.approveLeave.bind(this);
+    this.rejectLeave = this.rejectLeave.bind(this);
+    this.cancelLeave = this.cancelLeave.bind(this);
+    this.getTeamLeaves = this.getTeamLeaves.bind(this);
+    this.getLeavePolicies = this.getLeavePolicies.bind(this);
+    this.createLeavePolicy = this.createLeavePolicy.bind(this);
+    this.updateLeavePolicy = this.updateLeavePolicy.bind(this);
+  }
+
   async getLeaves(req: AuthRequest, res: Response) {
     const { status, page = '1', limit = '10' } = req.query;
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
@@ -96,8 +109,8 @@ class LeaveController {
       },
     });
 
-    // Update pending days in leave balance
-    await this.updateLeaveBalance(userId, data.leaveType, totalDays, 'pending');
+    // Update pending days in leave balance with leave start year
+    await this.updateLeaveBalance(userId, data.leaveType, totalDays, 'pending', data.startDate.getFullYear());
 
     // Send notification to manager
     if (leave.requester.manager) {
@@ -108,7 +121,7 @@ class LeaveController {
           data.startDate.toDateString(),
           data.endDate.toDateString()
         );
-        
+
         await sendEmail({
           to: leave.requester.manager.email,
           subject: template.subject,
@@ -178,12 +191,13 @@ class LeaveController {
       },
     });
 
-    // Update leave balance
+    // Update leave balance with leave start year
     await this.updateLeaveBalance(
       leave.requesterId,
       leave.leaveType,
       leave.totalDays,
-      'approve'
+      'approve',
+      leave.startDate.getFullYear()
     );
 
     // Send confirmation email
@@ -194,7 +208,7 @@ class LeaveController {
         leave.startDate.toDateString(),
         leave.endDate.toDateString()
       );
-      
+
       await sendEmail({
         to: leave.requester.email,
         subject: template.subject,
@@ -248,12 +262,13 @@ class LeaveController {
       },
     });
 
-    // Restore pending balance
+    // Restore pending balance with leave start year
     await this.updateLeaveBalance(
       leave.requesterId,
       leave.leaveType,
       leave.totalDays,
-      'reject'
+      'reject',
+      leave.startDate.getFullYear()
     );
 
     // Send rejection email
@@ -265,7 +280,7 @@ class LeaveController {
         leave.endDate.toDateString(),
         rejectionReason || 'No reason provided'
       );
-      
+
       await sendEmail({
         to: leave.requester.email,
         subject: template.subject,
@@ -303,13 +318,14 @@ class LeaveController {
       data: { status: LeaveStatus.CANCELLED },
     });
 
-    // Restore balance based on current status
+    // Restore balance based on current status with leave start year
     const balanceAction = leave.status === LeaveStatus.PENDING ? 'reject' : 'cancel';
     await this.updateLeaveBalance(
       leave.requesterId,
       leave.leaveType,
       leave.totalDays,
-      balanceAction
+      balanceAction,
+      leave.startDate.getFullYear()
     );
 
     res.json({ leave: updatedLeave });
@@ -429,12 +445,15 @@ class LeaveController {
       throw createError('You have overlapping leave requests', 400);
     }
 
-    // Check leave balance
+    // Get leavePolicyId for the provided leaveType
+    const leavePolicyId = await this.getLeavePolicyId(data.leaveType);
+
+    // Check leave balance using leavePolicyId instead of leaveType
     const balance = await prisma.leaveBalance.findUnique({
       where: {
-        userId_leaveType_year: {
+        userId_leavePolicyId_year: {
           userId,
-          leaveType: data.leaveType,
+          leavePolicyId,
           year: data.startDate.getFullYear(),
         },
       },
@@ -445,7 +464,7 @@ class LeaveController {
     }
 
     const totalDays = this.calculateLeaveDays(data.startDate, data.endDate, data.isHalfDay);
-    
+
     if (balance.availableDays < totalDays) {
       throw createError('Insufficient leave balance', 400);
     }
@@ -456,7 +475,7 @@ class LeaveController {
 
     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    
+
     return diffDays;
   }
 
@@ -464,59 +483,82 @@ class LeaveController {
     userId: string,
     leaveType: LeaveType,
     days: number,
-    action: 'pending' | 'approve' | 'reject' | 'cancel'
+    action: 'pending' | 'approve' | 'reject' | 'cancel',
+    year?: number // optional, to handle different years
   ) {
-    const balance = await prisma.leaveBalance.findUnique({
-      where: {
-        userId_leaveType_year: {
-          userId,
-          leaveType,
-          year: new Date().getFullYear(),
+    try {
+      const balanceYear = year || new Date().getFullYear();
+      const leavePolicyId = await this.getLeavePolicyId(leaveType);
+
+      if (!leavePolicyId) {
+        logger.error(`No leave policy found for leave type: ${leaveType}`);
+        return;
+      }
+
+      const balance = await prisma.leaveBalance.findUnique({
+        where: {
+          userId_leavePolicyId_year: {
+            userId,
+            leavePolicyId,
+            year: balanceYear,
+          },
         },
-      },
-    });
+      });
 
-    if (!balance) return;
+      if (!balance) {
+        logger.error(`Leave balance not found for user ${userId}, policy ${leavePolicyId}, year ${balanceYear}`);
+        return;
+      }
 
-    let updateData: any = {};
+      let updateData: any = {};
 
-    switch (action) {
-      case 'pending':
-        updateData = {
-          pendingDays: balance.pendingDays + days,
-          availableDays: balance.availableDays - days,
-        };
-        break;
-      case 'approve':
-        updateData = {
-          usedDays: balance.usedDays + days,
-          pendingDays: balance.pendingDays - days,
-        };
-        break;
-      case 'reject':
-        updateData = {
-          pendingDays: balance.pendingDays - days,
-          availableDays: balance.availableDays + days,
-        };
-        break;
-      case 'cancel':
-        updateData = {
-          usedDays: balance.usedDays - days,
-          availableDays: balance.availableDays + days,
-        };
-        break;
+      switch (action) {
+        case 'pending':
+          updateData = {
+            pendingDays: balance.pendingDays + days,
+            availableDays: balance.availableDays - days,
+          };
+          break;
+        case 'approve':
+          updateData = {
+            usedDays: balance.usedDays + days,
+            pendingDays: balance.pendingDays - days,
+          };
+          break;
+        case 'reject':
+          updateData = {
+            pendingDays: balance.pendingDays - days,
+            availableDays: balance.availableDays + days,
+          };
+          break;
+        case 'cancel':
+          updateData = {
+            usedDays: balance.usedDays - days,
+            availableDays: balance.availableDays + days,
+          };
+          break;
+      }
+
+      await prisma.leaveBalance.update({
+        where: {
+          userId_leavePolicyId_year: {
+            userId,
+            leavePolicyId,
+            year: balanceYear,
+          },
+        },
+        data: updateData,
+      });
+    } catch (error) {
+      logger.error('Failed to update leave balance', error);
     }
+  }
 
-    await prisma.leaveBalance.update({
-      where: {
-        userId_leaveType_year: {
-          userId,
-          leaveType,
-          year: new Date().getFullYear(),
-        },
-      },
-      data: updateData,
+  private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
+    const policy = await prisma.leavePolicy.findFirst({
+      where: { leaveType, isActive: true },
     });
+    return policy?.id || '';
   }
 }
 

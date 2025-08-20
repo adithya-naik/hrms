@@ -73,7 +73,7 @@ export function Sidebar({ className }: SidebarProps) {
   const userNavigation = navigation.filter(item => 
     item.roles.includes(user?.role || 'EMPLOYEE')
   );
-
+console.log("User Navigation",user)
   return (
     <div className={cn('pb-12 w-64', className)}>
       <div className="space-y-4 py-4">

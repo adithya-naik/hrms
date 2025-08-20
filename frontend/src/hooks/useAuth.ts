@@ -22,6 +22,7 @@ export const useAuth = () => {
           const result = await loginMutation({
             auth0Id: user.sub,
             email: user.email,
+            role:user.role,
           }).unwrap();
 
           dispatch(setCredentials({
