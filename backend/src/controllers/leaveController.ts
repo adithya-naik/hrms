@@ -468,9 +468,9 @@ class LeaveController {
   ) {
     const balance = await prisma.leaveBalance.findUnique({
       where: {
-        userId_leaveType_year: {
+        userId_leavePolicyId_year: {
           userId,
-          leaveType,
+          leavePolicyId: await this.getLeavePolicyId(leaveType),
           year: new Date().getFullYear(),
         },
       },
@@ -509,14 +509,21 @@ class LeaveController {
 
     await prisma.leaveBalance.update({
       where: {
-        userId_leaveType_year: {
+        userId_leavePolicyId_year: {
           userId,
-          leaveType,
+          leavePolicyId: await this.getLeavePolicyId(leaveType),
           year: new Date().getFullYear(),
         },
       },
       data: updateData,
     });
+  }
+
+  private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
+    const policy = await prisma.leavePolicy.findFirst({
+      where: { leaveType, isActive: true },
+    });
+    return policy?.id || '';
   }
 }
 

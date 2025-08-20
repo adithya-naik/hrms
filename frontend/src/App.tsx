@@ -8,6 +8,9 @@ import { store } from '@/store';
 import { Auth0ProviderWrapper } from '@/lib/auth0';
 import { Layout } from '@/components/Layout/Layout';
 import Dashboard from '@/pages/Dashboard';
+import MyLeaves from '@/pages/Leaves/MyLeaves';
+import ApplyLeave from '@/pages/Leaves/ApplyLeave';
+import TeamLeaves from '@/pages/Leaves/TeamLeaves';
 import Login from '@/pages/Login';
 import Unauthorized from '@/pages/Unauthorized';
 import NotFound from '@/pages/NotFound';
@@ -64,13 +67,13 @@ const App = () => (
                 }
               >
                 <Route index element={<Dashboard />} />
-                <Route path="leaves" element={<div>My Leaves Page</div>} />
-                <Route path="leaves/new" element={<div>Apply Leave Page</div>} />
+                <Route path="leaves" element={<MyLeaves />} />
+                <Route path="leaves/new" element={<ApplyLeave />} />
                 <Route
                   path="team-leaves"
                   element={
                     <ProtectedRoute roles={['MANAGER', 'HR', 'ADMIN']}>
-                      <div>Team Leaves Page</div>
+                      <TeamLeaves />
                     </ProtectedRoute>
                   }
                 />
