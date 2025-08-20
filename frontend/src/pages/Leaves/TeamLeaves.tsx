@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -237,7 +237,6 @@ export default function TeamLeaves() {
                                     </p>
                                   </div>
                                 )}
-
                                 {canApproveReject(selectedLeave) && (
                                   <div className="flex gap-2 pt-4 border-t">
                                     <Button
@@ -355,7 +354,6 @@ export default function TeamLeaves() {
                       {leave.status}
                     </Badge>
                   </div>
-
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -367,7 +365,6 @@ export default function TeamLeaves() {
                         {format(new Date(leave.appliedDate), 'MMM dd')}
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -405,7 +402,6 @@ export default function TeamLeaves() {
                                 <label className="text-sm font-medium">Reason</label>
                                 <p className="text-sm text-muted-foreground">{selectedLeave.reason}</p>
                               </div>
-
                               {canApproveReject(selectedLeave) && (
                                 <div className="flex gap-2 pt-4 border-t">
                                   <Button
