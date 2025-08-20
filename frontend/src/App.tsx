@@ -8,6 +8,9 @@ import { store } from '@/store';
 import { Auth0ProviderWrapper } from '@/lib/auth0';
 import { Layout } from '@/components/Layout/Layout';
 import Dashboard from '@/pages/Dashboard';
+import MyLeaves from '@/pages/Leaves/MyLeaves';
+import ApplyLeave from '@/pages/Leaves/ApplyLeave';
+import TeamLeaves from '@/pages/Leaves/TeamLeaves';
 import Login from '@/pages/Login';
 import Unauthorized from '@/pages/Unauthorized';
 import NotFound from '@/pages/NotFound';
@@ -28,11 +31,12 @@ const ProtectedRoute = ({ children, roles }: { children: React.ReactNode; roles?
     loginWithRedirect();
     return null;
   }
-
+console.log('User roles:', user , roles);
   // 🔑 Role-based protection (if roles passed in)
   if (roles && roles.length > 0) {
-    const userRoles = user?.['http://localhost:5173/roles'] || []; // 👈 update claim key if needed
-    const hasRole = roles.some((role) => userRoles.includes(role));
+    const userRoles = Array.isArray(user?.['http://localhost:5173/roles']) ? user['http://localhost:5173/roles'] : [];
+    const hasRole = roles.some(role => userRoles.includes(role));
+console.log("user roles:", userRoles, "Required roles:", roles, "Has role:", hasRole);
 
     if (!hasRole) {
       return <Navigate to="/unauthorized" replace />;
@@ -64,13 +68,13 @@ const App = () => (
                 }
               >
                 <Route index element={<Dashboard />} />
-                <Route path="leaves" element={<div>My Leaves Page</div>} />
-                <Route path="leaves/new" element={<div>Apply Leave Page</div>} />
+                <Route path="leaves" element={<MyLeaves />} />
+                <Route path="leaves/new" element={<ApplyLeave />} />
                 <Route
                   path="team-leaves"
                   element={
                     <ProtectedRoute roles={['MANAGER', 'HR', 'ADMIN']}>
-                      <div>Team Leaves Page</div>
+                      <TeamLeaves />
                     </ProtectedRoute>
                   }
                 />

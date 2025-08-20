@@ -57,6 +57,8 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
+    console.error('Token verification failed:', error);
+
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
@@ -70,6 +72,7 @@ export const authorize = (roles: UserRole[]) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
+console.log('\n\n\n\n\nUser role:\n\n\n\n', req.user.role, 'Allowed roles:', roles);
 
     next();
   };
