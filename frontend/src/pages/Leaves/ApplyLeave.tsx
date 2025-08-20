@@ -48,7 +48,6 @@ export default function ApplyLeave() {
   const form = useForm<LeaveFormData>({
     resolver: zodResolver(leaveSchema),
     defaultValues: {
-      leaveType: undefined,
       isHalfDay: false,
       emergencyLeave: false,
       attachments: [],
@@ -62,7 +61,7 @@ export default function ApplyLeave() {
   const calculateDays = () => {
     if (!watchedStartDate || !watchedEndDate) return 0;
     if (watchedIsHalfDay) return 0.5;
-
+    
     const diffTime = Math.abs(watchedEndDate.getTime() - watchedStartDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return diffDays;
@@ -136,18 +135,16 @@ export default function ApplyLeave() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Leave Type *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Leave Type" />
-                      </SelectTrigger>
-
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select leave type" />
+                        </SelectTrigger>
+                      </FormControl>
                       <SelectContent>
-                        <SelectItem value="select" disabled>
-                          Select Leave Type
-                        </SelectItem>
-                        {policiesData?.policies?.map(policy => (
+                        {policiesData?.policies?.map((policy: any) => (
                           <SelectItem key={policy.id} value={policy.leaveType}>
-                            {formatLeaveType(policy.leaveType)} ({policy.annualQuota} days)
+                            {formatLeaveType(policy.leaveType)} ({policy.annualQuota} days/year)
                           </SelectItem>
                         ))}
                       </SelectContent>

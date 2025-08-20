@@ -15,14 +15,14 @@ import { toast } from '@/components/ui/sonner';
 
 export default function MyLeaves() {
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [selectedLeave, setSelectedLeave] = useState<any>(null);
-  const filterStatus = status === 'all' ? undefined : status;
+
   const { data: leavesData, isLoading } = useGetLeavesQuery({
     page,
     limit: 10,
-    status: filterStatus,
+    status: status || undefined,
   });
 
   const [cancelLeave] = useCancelLeaveMutation();
@@ -105,7 +105,7 @@ export default function MyLeaves() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="">All Status</SelectItem>
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
@@ -267,7 +267,7 @@ export default function MyLeaves() {
                       {leave.status}
                     </Badge>
                   </div>
-
+                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -279,7 +279,7 @@ export default function MyLeaves() {
                         {format(new Date(leave.appliedDate), 'MMM dd')}
                       </div>
                     </div>
-
+                    
                     <div className="flex items-center gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
