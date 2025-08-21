@@ -10,7 +10,7 @@ export const useAuth = () => {
   const [loginMutation] = useLoginMutation();
   const [refreshTokenMutation] = useRefreshTokenMutation();
 
-  // Auto-fetch user profile if token exists but no user data
+  // Auto-fetch profile if we have token but not user object
   const { data: profileData, isLoading: profileLoading } = useGetProfileQuery(undefined, {
     skip: !token || !!user,
   });
@@ -24,16 +24,13 @@ export const useAuth = () => {
     }
   }, [profileData, user, token, dispatch]);
 
-  // Auto-refresh token if it's about to expire
+  // Auto-refresh JWT ~5min before expiry
   useEffect(() => {
     const checkTokenExpiry = async () => {
       if (token && refreshToken) {
         try {
-          // Decode token to check expiry (simple check)
           const tokenPayload = JSON.parse(atob(token.split('.')[1]));
           const currentTime = Date.now() / 1000;
-          
-          // If token expires in less than 5 minutes, refresh it
           if (tokenPayload.exp - currentTime < 300) {
             const result = await refreshTokenMutation(refreshToken).unwrap();
             dispatch(setCredentials({
@@ -48,7 +45,7 @@ export const useAuth = () => {
       }
     };
 
-    const interval = setInterval(checkTokenExpiry, 60000); // Check every minute
+    const interval = setInterval(checkTokenExpiry, 60_000);
     return () => clearInterval(interval);
   }, [token, refreshToken, refreshTokenMutation, dispatch]);
 
@@ -63,10 +60,7 @@ export const useAuth = () => {
       }));
       return { success: true };
     } catch (error: any) {
-      return { 
-        success: false, 
-        error: error?.data?.error || 'Login failed' 
-      };
+      return { success: false, error: error?.data?.error || 'Login failed' };
     } finally {
       dispatch(setLoading(false));
     }

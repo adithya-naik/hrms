@@ -3,8 +3,8 @@ import { authApi } from './api/authApi';
 import { leaveApi } from './api/leaveApi';
 import { userApi } from './api/userApi';
 import { dashboardApi } from './api/dashboardApi';
+import { reportApi } from './api/reportApi';
 import authReducer from './slices/authSlice';
-
 export const store = configureStore({
   reducer: {
     auth: authReducer,
@@ -12,21 +12,19 @@ export const store = configureStore({
     [leaveApi.reducerPath]: leaveApi.reducer,
     [userApi.reducerPath]: userApi.reducer,
     [dashboardApi.reducerPath]: dashboardApi.reducer,
+    [reportApi.reducerPath]: reportApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredActions: [
-          'persist/PERSIST',
-          'persist/REHYDRATE',
-          'persist/REGISTER',
-        ],
+        ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE', 'persist/REGISTER'],
       },
     }).concat(
       authApi.middleware,
       leaveApi.middleware,
       userApi.middleware,
-      dashboardApi.middleware
+      dashboardApi.middleware,
+      reportApi.middleware,
     ),
 });
 

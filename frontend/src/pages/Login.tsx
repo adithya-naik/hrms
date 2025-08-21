@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,13 +12,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar, Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
+  username: z.string().min(1, 'Username or Email is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
+  const location = useLocation() as any;
+  const from = location.state?.from?.pathname || '/';
   const { login, isAuthenticated, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -34,14 +36,13 @@ export default function Login() {
   const onSubmit = async (data: LoginFormData) => {
     setError('');
     const result = await login(data.username, data.password);
-    
     if (!result.success) {
       setError(result.error || 'Login failed');
     }
   };
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={from} replace />;
   }
 
   return (
@@ -53,7 +54,7 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-bold">Leave Management Portal</CardTitle>
           <CardDescription>
-            Sign in to access your leave management dashboard
+            Sign in with your <b>username or email</b> and password
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -72,11 +73,7 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Username or Email</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Enter your username or email"
-                        {...field}
-                        disabled={isLoading}
-                      />
+                      <Input placeholder="johndoe or john@company.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -93,7 +90,7 @@ export default function Login() {
                       <div className="relative">
                         <Input
                           type={showPassword ? 'text' : 'password'}
-                          placeholder="Enter your password"
+                          placeholder="Your password"
                           {...field}
                           disabled={isLoading}
                         />
@@ -105,11 +102,7 @@ export default function Login() {
                           onClick={() => setShowPassword(!showPassword)}
                           disabled={isLoading}
                         >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </FormControl>
@@ -118,12 +111,7 @@ export default function Login() {
                 )}
               />
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                size="lg"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </Button>
             </form>
@@ -131,7 +119,7 @@ export default function Login() {
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{' '}
+              Need an account?{' '}
               <Link to="/register" className="text-primary hover:underline">
                 Contact your HR administrator
               </Link>

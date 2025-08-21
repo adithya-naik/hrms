@@ -9,6 +9,7 @@ router.use(authMiddleware);
 
 router.get('/leave-summary', authorize([UserRole.HR, UserRole.ADMIN]), reportController.getLeaveSummary);
 router.get('/employee-balances', authorize([UserRole.HR, UserRole.ADMIN]), reportController.getEmployeeBalances);
+router.get('/department-analysis', authorize([UserRole.HR, UserRole.ADMIN]), reportController.getDepartmentAnalysis);
 router.get('/export/csv', authorize([UserRole.HR, UserRole.ADMIN]), reportController.exportCSV);
 
 export { router as reportRoutes };

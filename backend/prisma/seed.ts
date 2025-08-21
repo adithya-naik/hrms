@@ -1,4 +1,5 @@
 import { PrismaClient, UserRole, LeaveType, LeaveStatus } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -6,43 +7,52 @@ async function main() {
   console.log('🌱 Starting database seeding...');
 
   // ----------------------
-  // Create departments
+  // Departments
   // ----------------------
   const departments = await Promise.all([
-    prisma.department.create({
-      data: {
+    prisma.department.upsert({
+      where: { name: 'Engineering' },
+      update: {},
+      create: {
         name: 'Engineering',
         description: 'Software development and technical operations',
       },
     }),
-    prisma.department.create({
-      data: {
+    prisma.department.upsert({
+      where: { name: 'Human Resources' },
+      update: {},
+      create: {
         name: 'Human Resources',
         description: 'HR operations and employee management',
       },
     }),
-    prisma.department.create({
-      data: {
+    prisma.department.upsert({
+      where: { name: 'Marketing' },
+      update: {},
+      create: {
         name: 'Marketing',
         description: 'Marketing and brand management',
       },
     }),
-    prisma.department.create({
-      data: {
+    prisma.department.upsert({
+      where: { name: 'Sales' },
+      update: {},
+      create: {
         name: 'Sales',
         description: 'Sales and business development',
       },
     }),
   ]);
-
-  console.log('✅ Created departments');
+  console.log('✅ Created/Upserted departments');
 
   // ----------------------
-  // Create leave policies
+  // Leave Policies
   // ----------------------
   const leavePolicies = await Promise.all([
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.SICK },
+      update: {},
+      create: {
         leaveType: LeaveType.SICK,
         annualQuota: 12,
         maxConsecutiveDays: 5,
@@ -52,8 +62,10 @@ async function main() {
         carryForwardAllowed: false,
       },
     }),
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.CASUAL },
+      update: {},
+      create: {
         leaveType: LeaveType.CASUAL,
         annualQuota: 15,
         maxConsecutiveDays: 3,
@@ -64,8 +76,10 @@ async function main() {
         maxCarryForward: 5,
       },
     }),
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.VACATION },
+      update: {},
+      create: {
         leaveType: LeaveType.VACATION,
         annualQuota: 20,
         maxConsecutiveDays: 10,
@@ -76,8 +90,10 @@ async function main() {
         maxCarryForward: 10,
       },
     }),
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.ACADEMIC },
+      update: {},
+      create: {
         leaveType: LeaveType.ACADEMIC,
         annualQuota: 5,
         maxConsecutiveDays: 2,
@@ -87,8 +103,10 @@ async function main() {
         carryForwardAllowed: false,
       },
     }),
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.COMP_OFF },
+      update: {},
+      create: {
         leaveType: LeaveType.COMP_OFF,
         annualQuota: 12,
         maxConsecutiveDays: 2,
@@ -99,8 +117,10 @@ async function main() {
         maxCarryForward: 6,
       },
     }),
-    prisma.leavePolicy.create({
-      data: {
+    prisma.leavePolicy.upsert({
+      where: { leaveType: LeaveType.WFH },
+      update: {},
+      create: {
         leaveType: LeaveType.WFH,
         annualQuota: 50,
         maxConsecutiveDays: 5,
@@ -111,106 +131,131 @@ async function main() {
       },
     }),
   ]);
-
-  console.log('✅ Created leave policies');
+  console.log('✅ Created/Upserted leave policies');
 
   // ----------------------
-  // Create sample users
+  // Users (your emails)
   // ----------------------
-  const admin = await prisma.user.create({
-    data: {
-      auth0Id: 'auth0|admin123',
-      email: 'admin@company.com',
+  const hashedPassword = await bcrypt.hash('Password123', 10);
+
+  const admin = await prisma.user.upsert({
+    where: { email: 'jatothadithyanaik@gmail.com' },
+    update: {},
+    create: {
+      email: 'jatothadithyanaik@gmail.com',
+      username: 'adminuser',
+      password: hashedPassword,
       firstName: 'Admin',
       lastName: 'User',
       employeeId: 'EMP001',
       role: UserRole.ADMIN,
       departmentId: departments[1].id, // HR
       joinDate: new Date('2020-01-01'),
+      isActive: true, 
     },
   });
 
-  const hrManager = await prisma.user.create({
-    data: {
-      auth0Id: 'auth0|hr123',
-      email: 'hr@company.com',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
+  const hr = await prisma.user.upsert({
+    where: { email: 'adithyanaikaj@gmail.com' },
+    update: {},
+    create: {
+      email: 'adithyanaikaj@gmail.com',
+      username: 'hrmanager',
+      password: hashedPassword,
+      firstName: 'HR',
+      lastName: 'Manager',
       employeeId: 'EMP002',
       role: UserRole.HR,
-      departmentId: departments[1].id, // HR
+      departmentId: departments[1].id,
       joinDate: new Date('2020-06-01'),
+      isActive: true, 
     },
   });
 
-  const engineeringManager = await prisma.user.create({
-    data: {
-      auth0Id: 'auth0|mgr123',
-      email: 'manager@company.com',
-      firstName: 'John',
-      lastName: 'Smith',
+  const manager = await prisma.user.upsert({
+    where: { email: 'adithyaj219@gmail.com' },
+    update: {},
+    create: {
+      email: 'adithyaj219@gmail.com',
+      username: 'manager1',
+      password: hashedPassword,
+      firstName: 'Manager',
+      lastName: 'One',
       employeeId: 'EMP003',
       role: UserRole.MANAGER,
-      departmentId: departments[0].id, // Engineering
+      departmentId: departments[0].id,
       joinDate: new Date('2021-01-15'),
+      isActive: true, 
     },
   });
 
-  const employees = await Promise.all([
-    prisma.user.create({
-      data: {
-        auth0Id: 'auth0|emp123',
-        email: 'employee1@company.com',
-        firstName: 'Alice',
-        lastName: 'Brown',
-        employeeId: 'EMP004',
-        role: UserRole.EMPLOYEE,
-        managerId: engineeringManager.id,
-        departmentId: departments[0].id, // Engineering
-        joinDate: new Date('2021-03-01'),
+  const employee = await prisma.user.upsert({
+    where: { email: 'idbhosting@gmail.com' },
+    update: {},
+    create: {
+      email: 'idbhosting@gmail.com',
+      username: 'employee1',
+      password: hashedPassword,
+      firstName: 'Employee',
+      lastName: 'One',
+      employeeId: 'EMP004',
+      role: UserRole.EMPLOYEE,
+      managerId: manager.id,
+      departmentId: departments[0].id,
+      joinDate: new Date('2021-03-01'),
+      isActive: true, 
+    },
+  });
+
+  console.log('✅ Created/Upserted your 4 main users');
+
+  // ----------------------
+  // Holidays
+  // ----------------------
+  const currentYear = new Date().getFullYear();
+  await Promise.all([
+    prisma.holiday.upsert({
+      where: { name: "New Year's Day" },
+      update: {},
+      create: {
+        name: "New Year's Day",
+        date: new Date(`${currentYear}-01-01`),
+        description: 'New Year celebration',
+        isRecurring: true,
       },
     }),
-    prisma.user.create({
-      data: {
-        auth0Id: 'auth0|emp456',
-        email: 'employee2@company.com',
-        firstName: 'Bob',
-        lastName: 'Wilson',
-        employeeId: 'EMP005',
-        role: UserRole.EMPLOYEE,
-        managerId: engineeringManager.id,
-        departmentId: departments[0].id, // Engineering
-        joinDate: new Date('2021-05-15'),
-      },
-    }),
-    prisma.user.create({
-      data: {
-        auth0Id: 'auth0|emp789',
-        email: 'employee3@company.com',
-        firstName: 'Carol',
-        lastName: 'Davis',
-        employeeId: 'EMP006',
-        role: UserRole.EMPLOYEE,
-        departmentId: departments[2].id, // Marketing
-        joinDate: new Date('2021-08-01'),
+    prisma.holiday.upsert({
+      where: { name: 'Independence Day' },
+      update: {},
+      create: {
+        name: 'Independence Day',
+        date: new Date(`${currentYear}-07-04`),
+        description: 'Independence Day celebration',
+        isRecurring: true,
       },
     }),
   ]);
-
-  console.log('✅ Created sample users');
+  console.log('✅ Created/Upserted holidays');
 
   // ----------------------
-  // Create leave balances for all users
+  // Leave balances (for the 4 users only)
   // ----------------------
-  const currentYear = new Date().getFullYear();
-  const allUsers = [admin, hrManager, engineeringManager, ...employees];
+  const allUsers = [admin, hr, manager, employee];
 
   for (const user of allUsers) {
     for (const policy of leavePolicies) {
-      await prisma.leaveBalance.create({
-        data: {
+      await prisma.leaveBalance.upsert({
+        where: {
+          userId_leavePolicyId_year: {
+            userId: user.id,
+            leavePolicyId: policy.id,
+            year: currentYear,
+          },
+        },
+        update: {},
+        create: {
           userId: user.id,
-          leavePolicyId: policy.id, // updated
+          leavePolicyId: policy.id,
           year: currentYear,
           totalQuota: policy.annualQuota,
           usedDays: 0,
@@ -221,89 +266,9 @@ async function main() {
       });
     }
   }
-
-  console.log('✅ Created leave balances');
-
-  // ----------------------
-  // Create sample holidays
-  // ----------------------
-  const holidays = await Promise.all([
-    prisma.holiday.create({
-      data: {
-        name: "New Year's Day",
-        date: new Date(`${currentYear}-01-01`),
-        description: 'New Year celebration',
-        isRecurring: true,
-      },
-    }),
-    prisma.holiday.create({
-      data: {
-        name: 'Independence Day',
-        date: new Date(`${currentYear}-07-04`),
-        description: 'Independence Day celebration',
-        isRecurring: true,
-      },
-    }),
-    prisma.holiday.create({
-      data: {
-        name: 'Christmas Day',
-        date: new Date(`${currentYear}-12-25`),
-        description: 'Christmas celebration',
-        isRecurring: true,
-      },
-    }),
-    prisma.holiday.create({
-      data: {
-        name: 'Thanksgiving',
-        date: new Date(`${currentYear}-11-24`),
-        description: 'Thanksgiving holiday',
-        isRecurring: true,
-      },
-    }),
-  ]);
-
-  console.log('✅ Created holidays');
-
-  // ----------------------
-  // Create sample leave requests
-  // ----------------------
-  const sampleLeaves = await Promise.all([
-    prisma.leave.create({
-      data: {
-        requesterId: employees[0].id,
-        leaveType: LeaveType.VACATION,
-        startDate: new Date(`${currentYear}-12-20`),
-        endDate: new Date(`${currentYear}-12-22`),
-        totalDays: 3,
-        reason: 'Family vacation for Christmas',
-        status: LeaveStatus.PENDING,
-      },
-    }),
-    prisma.leave.create({
-      data: {
-        requesterId: employees[1].id,
-        approverId: engineeringManager.id,
-        leaveType: LeaveType.SICK,
-        startDate: new Date(`${currentYear}-11-15`),
-        endDate: new Date(`${currentYear}-11-16`),
-        totalDays: 2,
-        reason: 'Flu symptoms',
-        status: LeaveStatus.APPROVED,
-        approvedDate: new Date(),
-      },
-    }),
-  ]);
-
-  console.log('✅ Created sample leave requests');
+  console.log('✅ Created/Upserted leave balances for users');
 
   console.log('🎉 Database seeding completed successfully!');
-  console.log('\n📊 Summary:');
-  console.log(`- ${departments.length} departments created`);
-  console.log(`- ${leavePolicies.length} leave policies created`);
-  console.log(`- ${allUsers.length} users created`);
-  console.log(`- ${allUsers.length * leavePolicies.length} leave balances created`);
-  console.log(`- ${holidays.length} holidays created`);
-  console.log(`- ${sampleLeaves.length} sample leave requests created`);
 }
 
 main()

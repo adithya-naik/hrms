@@ -27,6 +27,7 @@ class UserController {
           { lastName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { employeeId: { contains: search, mode: 'insensitive' } },
+          { username: { contains: search, mode: 'insensitive' } },
         ],
       };
     }
@@ -36,6 +37,7 @@ class UserController {
         where,
         select: {
           id: true,
+          username: true,
           email: true,
           firstName: true,
           lastName: true,
@@ -43,19 +45,8 @@ class UserController {
           role: true,
           isActive: true,
           joinDate: true,
-          department: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
+          department: { select: { id: true, name: true } },
+          manager: { select: { id: true, firstName: true, lastName: true } },
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -83,22 +74,8 @@ class UserController {
       where: { id },
       include: {
         department: true,
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        employees: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        employees: { select: { id: true, firstName: true, lastName: true, email: true } },
         leaveBalances: {
           where: { year: new Date().getFullYear() },
           include: { leavePolicy: true },
@@ -106,9 +83,7 @@ class UserController {
       },
     });
 
-    if (!user) {
-      throw createError('User not found', 404);
-    }
+    if (!user) throw createError('User not found', 404);
 
     res.json({ user });
   }
@@ -122,14 +97,7 @@ class UserController {
       data,
       include: {
         department: true,
-        manager: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
 

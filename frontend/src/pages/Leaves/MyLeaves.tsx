@@ -19,11 +19,11 @@ export default function MyLeaves() {
   const [search, setSearch] = useState('');
   const [selectedLeave, setSelectedLeave] = useState<any>(null);
 
-  const { data: leavesData, isLoading } = useGetLeavesQuery({
-    page,
-    limit: 10,
-    status: status || undefined,
-  });
+const { data: leavesData, isLoading } = useGetLeavesQuery({
+  page,
+  limit: 10,
+  status: status === "ALL" ? undefined : status, 
+});
 
   const [cancelLeave] = useCancelLeaveMutation();
 
@@ -100,18 +100,18 @@ export default function MyLeaves() {
               />
             </div>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Status</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-                <SelectItem value="CANCELLED">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+  <SelectTrigger className="w-full sm:w-[180px]">
+    <Filter className="mr-2 h-4 w-4" />
+    <SelectValue placeholder="Filter by status" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="ALL">All Status</SelectItem>
+    <SelectItem value="PENDING">Pending</SelectItem>
+    <SelectItem value="APPROVED">Approved</SelectItem>
+    <SelectItem value="REJECTED">Rejected</SelectItem>
+    <SelectItem value="CANCELLED">Cancelled</SelectItem>
+  </SelectContent>
+</Select>
           </div>
 
           {/* Desktop Table */}
