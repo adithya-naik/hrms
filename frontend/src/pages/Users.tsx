@@ -24,6 +24,7 @@ import {
   useGetManagersQuery,
 } from '../store/api/userApi';
 
+// ---- Schema ----
 const userSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -31,11 +32,14 @@ const userSchema = z.object({
   email: z.string().email('Invalid email format'),
   employeeId: z.string().min(1, 'Employee ID is required'),
   role: z.enum(['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']),
+  // These are optional. We'll use sentinel 'none' in the UI and map to undefined on submit.
   departmentId: z.string().optional(),
   managerId: z.string().optional(),
 });
-
 type UserFormData = z.infer<typeof userSchema>;
+
+// Sentinel value for "no selection" in Radix Select (cannot use empty string)
+const NONE = 'none';
 
 export default function Users() {
   const [search, setSearch] = useState('');
@@ -44,20 +48,30 @@ export default function Users() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  // API hooks
+  // ---- Queries ----
   const { data, isLoading, isError } = useGetUsersQuery({
     search,
     role: roleFilter !== 'all' ? roleFilter : undefined,
     department: departmentFilter !== 'all' ? departmentFilter : undefined,
   });
 
-  const { data: departments = [] } = useGetDepartmentsQuery();
-  const { data: managers = [] } = useGetManagersQuery();
+  // getDepartments returns an array per your userApi typing; still guard for both shapes
+  const { data: depData } = useGetDepartmentsQuery();
+  const departments = Array.isArray(depData) ? depData : depData?.departments ?? [];
 
+  // getManagers calls /users?role=MANAGER but your backend returns { users, pagination }
+  const { data: managersData } = useGetManagersQuery();
+  const managersRaw = Array.isArray(managersData)
+    ? managersData
+    : managersData?.users ?? [];
+  const managers = managersRaw.filter((m: any) => m.role === 'MANAGER');
+
+  // ---- Mutations ----
   const [createUser] = useCreateUserMutation();
   const [updateUser] = useUpdateUserMutation();
   const [deleteUser] = useDeleteUserMutation();
 
+  // ---- Form ----
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -67,10 +81,18 @@ export default function Users() {
       email: '',
       employeeId: '',
       role: 'EMPLOYEE',
+      // keep undefined in form state; use NONE sentinel only when binding to <Select>
+      departmentId: undefined,
+      managerId: undefined,
     },
   });
 
-  const users = data?.users || [];
+  // Support either { users: [...] } or a direct array (defensive)
+  const users = Array.isArray((data as any)?.users)
+    ? (data as any).users
+    : Array.isArray(data)
+    ? (data as any)
+    : [];
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -81,20 +103,35 @@ export default function Users() {
       case 'MANAGER':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'EMPLOYEE':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const onSubmit = async (data: UserFormData) => {
+  const safeFormatDate = (value?: string | Date) => {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return 'N/A';
+    return format(d, 'MMM dd, yyyy');
+  };
+
+  const onSubmit = async (payload: UserFormData) => {
     try {
+      // Map NONE -> undefined before sending to API
+      const normalized = {
+        ...payload,
+        departmentId: payload.departmentId && payload.departmentId !== NONE ? payload.departmentId : undefined,
+        managerId: payload.managerId && payload.managerId !== NONE ? payload.managerId : undefined,
+      };
+
       if (selectedUser) {
-        await updateUser({ id: selectedUser.id, ...data }).unwrap();
+        await updateUser({ id: selectedUser.id, ...normalized }).unwrap();
       } else {
-        await createUser(data).unwrap();
+        await createUser(normalized).unwrap();
       }
+
       setIsCreateDialogOpen(false);
+      setSelectedUser(null);
       form.reset();
     } catch (error) {
       console.error('Error saving user:', error);
@@ -104,20 +141,22 @@ export default function Users() {
   const handleEdit = (user: any) => {
     setSelectedUser(user);
     form.reset({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      username: user.username,
-      email: user.email,
-      employeeId: user.employeeId,
-      role: user.role,
-      departmentId: user.department?.id,
-      managerId: user.manager?.id,
+      firstName: user.firstName ?? '',
+      lastName: user.lastName ?? '',
+      username: user.username ?? '',
+      email: user.email ?? '',
+      employeeId: user.employeeId ?? '',
+      role: user.role ?? 'EMPLOYEE',
+      // keep undefined; UI Select will convert to NONE when binding
+      departmentId: user.department?.id ?? undefined,
+      managerId: user.manager?.id ?? undefined,
     });
     setIsCreateDialogOpen(true);
   };
 
   const handleDelete = async (userId: string) => {
     try {
+      // your mutation expects a raw string id per userApi
       await deleteUser(userId).unwrap();
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -134,25 +173,29 @@ export default function Users() {
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
           <p className="text-muted-foreground">Manage employee accounts and permissions</p>
         </div>
+
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" onClick={() => {
-              setSelectedUser(null);
-              form.reset();
-            }}>
+            <Button
+              size="lg"
+              onClick={() => {
+                setSelectedUser(null);
+                form.reset();
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Add User
             </Button>
           </DialogTrigger>
+
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>
-                {selectedUser ? 'Edit User' : 'Create New User'}
-              </DialogTitle>
+              <DialogTitle>{selectedUser ? 'Edit User' : 'Create New User'}</DialogTitle>
               <DialogDescription>
                 {selectedUser ? 'Update user information and permissions' : 'Add a new user to the system'}
               </DialogDescription>
             </DialogHeader>
+
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -234,7 +277,7 @@ export default function Users() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Role</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select role" />
@@ -251,21 +294,27 @@ export default function Users() {
                       </FormItem>
                     )}
                   />
+
                   <FormField
                     control={form.control}
                     name="departmentId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Department</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={(v) => field.onChange(v === NONE ? undefined : v)}
+                          value={field.value ?? NONE}
+                        >
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {departments.map((dept) => (
-                              <SelectItem key={dept.id} value={dept.id}>
+                            {/* Radix Select: value must NOT be empty string */}
+                            <SelectItem value={NONE}>No Department</SelectItem>
+                            {departments.map((dept: any) => (
+                              <SelectItem key={dept.id} value={String(dept.id)}>
                                 {dept.name}
                               </SelectItem>
                             ))}
@@ -283,16 +332,20 @@ export default function Users() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Manager (Optional)</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === NONE ? undefined : v)}
+                        value={field.value ?? NONE}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select manager" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">No Manager</SelectItem>
-                          {managers.map((manager) => (
-                            <SelectItem key={manager.id} value={manager.id}>
+                          {/* Radix Select: value must NOT be empty string */}
+                          <SelectItem value={NONE}>No Manager</SelectItem>
+                          {managers.map((manager: any) => (
+                            <SelectItem key={manager.id} value={String(manager.id)}>
                               {manager.firstName} {manager.lastName}
                             </SelectItem>
                           ))}
@@ -307,9 +360,7 @@ export default function Users() {
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit">
-                    {selectedUser ? 'Update User' : 'Create User'}
-                  </Button>
+                  <Button type="submit">{selectedUser ? 'Update User' : 'Create User'}</Button>
                 </div>
               </form>
             </Form>
@@ -334,6 +385,7 @@ export default function Users() {
                 className="pl-10"
               />
             </div>
+
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="Filter by role" />
@@ -346,14 +398,15 @@ export default function Users() {
                 <SelectItem value="ADMIN">Admin</SelectItem>
               </SelectContent>
             </Select>
+
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by department" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.name}>
+                {departments.map((dept: any) => (
+                  <SelectItem key={dept.id} value={String(dept.id)}>
                     {dept.name}
                   </SelectItem>
                 ))}
@@ -375,7 +428,7 @@ export default function Users() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {users.map((user: any) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div>
@@ -386,19 +439,25 @@ export default function Users() {
                       <div className="text-xs text-muted-foreground">{user.employeeId}</div>
                     </div>
                   </TableCell>
+
                   <TableCell>
                     <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
                   </TableCell>
+
                   <TableCell>{user.department?.name || 'N/A'}</TableCell>
+
                   <TableCell>
                     {user.manager ? `${user.manager.firstName} ${user.manager.lastName}` : 'N/A'}
                   </TableCell>
-                  <TableCell>{format(new Date(user.joinDate), 'MMM dd, yyyy')}</TableCell>
+
+                  <TableCell>{safeFormatDate(user.joinDate)}</TableCell>
+
                   <TableCell>
                     <Badge className={user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </Badge>
                   </TableCell>
+
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleEdit(user)}>

@@ -32,6 +32,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import Departments from '@/components/Departments';
+import GeneralSettings from '@/components/GeneralSettings';
 
 const leavePolicySchema = z.object({
   leaveType: z.enum(['SICK', 'CASUAL', 'VACATION', 'ACADEMIC', 'COMP_OFF', 'WFH']),
@@ -51,7 +53,7 @@ export default function Settings() {
   const [isCreatePolicyDialogOpen, setIsCreatePolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
 
- const form = useForm<LeavePolicyFormData>({
+  const form = useForm<LeavePolicyFormData>({
     resolver: zodResolver(leavePolicySchema),
     defaultValues: {
       leaveType: "SICK",
@@ -63,8 +65,8 @@ export default function Settings() {
     },
   });
 
-  const { data,isLoading } = useGetLeavePoliciesQuery();
-   const leavePolicies = data?.policies ?? [];
+  const { data, isLoading } = useGetLeavePoliciesQuery();
+  const leavePolicies = data?.policies ?? [];
   const [createLeavePolicy] = useCreateLeavePolicyMutation();
   const [updateLeavePolicy] = useUpdateLeavePolicyMutation();
   const [deleteLeavePolicy] = useDeleteLeavePolicyMutation();
@@ -444,7 +446,7 @@ export default function Settings() {
                                   Delete Leave Policy
                                 </AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete <b>{formatLeaveType(policy.leaveType)}</b>? 
+                                  Are you sure you want to delete <b>{formatLeaveType(policy.leaveType)}</b>?
                                   This action cannot be undone.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
@@ -479,7 +481,7 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Department management coming soon...</p>
+              <Departments />
             </CardContent>
           </Card>
         </TabsContent>
@@ -493,8 +495,8 @@ export default function Settings() {
                 Configure global system settings and preferences
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">System settings coming soon...</p>
+            <CardContent className='p-6 space-y-4 text-gray-900 bg-white'>
+              <GeneralSettings />
             </CardContent>
           </Card>
         </TabsContent>

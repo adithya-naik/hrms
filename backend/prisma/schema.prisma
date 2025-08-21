@@ -164,7 +164,21 @@ model Holiday {
 
   @@map("holidays")
 }
-
+model Setting {
+  id           String   @id @default(cuid())
+  companyName  String
+  logoUrl      String?   // optional
+  address      String?   // optional
+  contactEmail String?   // optional
+  contactPhone String?   // optional
+  timezone     String
+  currency     String
+  dateFormat   String
+  timeFormat   String
+  language     String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
 model Notification {
   id        String   @id @default(cuid())
   userId    String
