@@ -26,7 +26,7 @@ export function Header() {
             </span>
           </div>
         </div>
-        
+
         <div className="flex flex-1 items-center space-x-2 justify-end">
           <div className="hidden lg:flex lg:w-72">
             <div className="relative w-full">
@@ -37,14 +37,14 @@ export function Header() {
               />
             </div>
           </div>
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-4 w-4" />
-                <Badge 
-                  variant="destructive" 
-                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs"
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-1 -right-1 h-5 w-5 rounded-full text-xs flex items-center justify-center"
                 >
                   3
                 </Badge>
