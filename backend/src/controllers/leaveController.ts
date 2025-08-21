@@ -139,7 +139,7 @@ class LeaveController {
 
   async getLeaveBalances(req: AuthRequest, res: Response) {
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
-
+console.log("\n\n\User from token:\n\n\n", req.user);
     const balances = await prisma.leaveBalance.findMany({
       where: {
         userId: req.user!.id,

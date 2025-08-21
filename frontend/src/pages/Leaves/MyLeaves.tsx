@@ -19,6 +19,7 @@ export default function MyLeaves() {
   const [search, setSearch] = useState('');
   const [selectedLeave, setSelectedLeave] = useState<any>(null);
 
+
 const { data: leavesData, isLoading } = useGetLeavesQuery({
   page,
   limit: 10,

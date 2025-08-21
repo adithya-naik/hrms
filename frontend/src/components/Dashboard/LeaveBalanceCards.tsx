@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Calendar, Clock, CheckCircle } from 'lucide-react';
 
 interface LeaveBalanceCardsProps {
@@ -27,38 +26,66 @@ export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {balances?.map((balance: any) => {
-        const usagePercentage = ((balance.totalQuota - balance.availableDays) / balance.totalQuota) * 100;
-        
+        const used = balance.usedDays;
+        const total = balance.totalQuota;
+        const available = balance.availableDays;
+        const percentageAvailable = Math.round((available / total) * 100);
+
+        const radius = 28; // smaller radius
+        const circumference = 2 * Math.PI * radius;
+        const offset = circumference - (percentageAvailable / 100) * circumference;
+
         return (
-          <Card key={balance.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
+          <Card key={balance.id} className="hover:shadow-md transition-shadow flex flex-col items-center justify-center p-3">
+            <CardHeader className="flex flex-col items-center space-y-1">
+              {getLeaveTypeIcon(balance.leavePolicy?.leaveType || balance.leaveType)}
+              <CardTitle className="text-xs font-medium text-center">
                 {formatLeaveType(balance.leavePolicy?.leaveType || balance.leaveType)}
               </CardTitle>
-              {getLeaveTypeIcon(balance.leavePolicy?.leaveType || balance.leaveType)}
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {balance.availableDays}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  of {balance.totalQuota} days
+            
+            <CardContent className="flex flex-col items-center">
+              {/* Smaller Circular Progress */}
+              <div className="relative w-16 h-16">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    className="text-muted stroke-current"
+                    strokeWidth="5"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx="50%"
+                    cy="50%"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={0}
+                  />
+                  <circle
+                    className="text-green-500 stroke-current transition-all duration-500"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx="50%"
+                    cy="50%"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={offset}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className="text-sm font-bold text-green-600">{available}</span>
+                  <span className="text-[10px] text-muted-foreground">/{total}</span>
                 </div>
               </div>
-              
-              <Progress value={100 - usagePercentage} className="h-2" />
-              
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Used: {balance.usedDays}</span>
-                <span>Pending: {balance.pendingDays}</span>
+
+              {/* Details */}
+              <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5 text-center">
+                <div>Used: {used}</div>
+                <div>Pending: {balance.pendingDays}</div>
+                {balance.carryForward > 0 && (
+                  <div className="text-blue-600">Carry: {balance.carryForward}</div>
+                )}
               </div>
-              
-              {balance.carryForward > 0 && (
-                <div className="text-xs text-blue-600">
-                  Carry Forward: {balance.carryForward} days
-                </div>
-              )}
             </CardContent>
           </Card>
         );

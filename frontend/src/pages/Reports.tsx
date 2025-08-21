@@ -55,11 +55,19 @@ export default function Reports() {
 
   // Export handler
   const handleExport = (format: "csv" | "pdf") => {
-    window.open(
-      `http://localhost:5000/api/reports/export/${format}?startDate=${params.startDate}&endDate=${params.endDate}`,
-      "_blank"
-    );
-  };
+  let type = reportType; // "summary" | "employee" | "department"
+  let url = `http://localhost:5000/api/reports/export/${type}/${format}`;
+
+  if (type === "summary" || type === "department") {
+    url += `?startDate=${params.startDate}&endDate=${params.endDate}`;
+  }
+  if (type === "employee") {
+    url += `?year=2025`;
+  }
+
+  window.open(url, "_blank");
+};
+
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -114,11 +122,11 @@ export default function Reports() {
             </Tabs>
             <div className="flex gap-3">
               <Button variant="outline" onClick={() => handleExport("csv")}>
-                <Download className="h-4 w-4 mr-1" /> Export CSV
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("pdf")}>
-                <Download className="h-4 w-4 mr-1" /> Export PDF
-              </Button>
+  <Download className="h-4 w-4 mr-1" /> Export CSV
+</Button>
+<Button variant="outline" onClick={() => handleExport("pdf")}>
+  <Download className="h-4 w-4 mr-1" /> Export PDF
+</Button>
             </div>
           </div>
         </CardContent>
@@ -230,7 +238,7 @@ export default function Reports() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Total Employees</CardTitle>
+                    <CardTitle>Total Leaves</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-3xl font-bold">{employeeData.balances.length}</p>

@@ -1,140 +1,134 @@
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  FileText, 
-  Users, 
-  Settings, 
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  LayoutDashboard,
+  Calendar,
+  Users,
+  Settings,
   BarChart3,
   LogOut,
-  User
-} from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/store';
-import { useAuth } from '@/hooks/useAuth';
+  User,
+  Menu,
+  X,
+  FileText,
+} from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "@/store";
+import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/',
-    icon: LayoutDashboard,
-    roles: ['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN'],
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "My Leaves", href: "/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "Team Leaves", href: "/team-leaves", icon: Users, roles: ["MANAGER", "HR", "ADMIN"] },
+  {name: 'Leave Requests',href: '/leave-requests',icon: FileText,roles: ['MANAGER', 'HR', 'ADMIN'],
   },
-  {
-    name: 'My Leaves',
-    href: '/leaves',
-    icon: Calendar,
-    roles: ['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN'],
-  },
-  {
-    name: 'Team Leaves',
-    href: '/team-leaves',
-    icon: Users,
-    roles: ['MANAGER', 'HR', 'ADMIN'],
-  },
-  {
-    name: 'Leave Requests',
-    href: '/leave-requests',
-    icon: FileText,
-    roles: ['MANAGER', 'HR', 'ADMIN'],
-  },
-  {
-    name: 'Reports',
-    href: '/reports',
-    icon: BarChart3,
-    roles: ['HR', 'ADMIN'],
-  },
-  {
-    name: 'Users',
-    href: '/users',
-    icon: Users,
-    roles: ['HR', 'ADMIN'],
-  },
-  {
-    name: 'Settings',
-    href: '/settings',
-    icon: Settings,
-    roles: ['ADMIN'],
-  },
+  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
+  { name: "Users", href: "/users", icon: Users, roles: ["HR", "ADMIN"] },
+  { name: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
 ];
 
-interface SidebarProps {
-  className?: string;
-}
-
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar() {
   const location = useLocation();
   const { user } = useSelector((state: RootState) => state.auth);
   const { logout } = useAuth();
+  const isMobile = useIsMobile();
+  const [open, setOpen] = React.useState(false);
 
-  const userNavigation = navigation.filter(item => 
-    item.roles.includes(user?.role || 'EMPLOYEE')
+  const allowedNavigation = navigation.filter(
+    (item) => user && item.roles.includes(user.role)
   );
-console.log("User Navigation",user)
+
   return (
-    <div className={cn('pb-12 w-64', className)}>
-      <div className="space-y-4 py-4">
-        <div className="px-3 py-2">
-          <div className="flex items-center mb-6">
-            <Calendar className="h-8 w-8 text-primary" />
-            <h2 className="ml-2 text-lg font-semibold">Leave Portal</h2>
-          </div>
-          
-          <div className="space-y-1">
-            <ScrollArea className="h-[calc(100vh-300px)]">
-              {userNavigation.map((item) => {
-                const isActive = location.pathname === item.href;
-                return (
-                  <Button
-                    key={item.name}
-                    variant={isActive ? 'secondary' : 'ghost'}
-                    className={cn(
-                      'w-full justify-start',
-                      isActive && 'bg-secondary'
-                    )}
-                    asChild
-                  >
-                    <Link to={item.href}>
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {item.name}
-                    </Link>
-                  </Button>
-                );
-              })}
-            </ScrollArea>
-          </div>
+    <>
+      {/* Mobile top bar */}
+      {isMobile && (
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-white fixed inset-x-0 top-0 z-50">
+          <h2 className="text-lg font-semibold">Leave Portal</h2>
+          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+            {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </Button>
         </div>
-        
-        <div className="px-3 py-2 border-t">
-          <div className="flex items-center space-x-3 mb-4">
-            <div className="flex-shrink-0">
-              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                <User className="h-4 w-4 text-primary-foreground" />
-              </div>
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={cn(
+          "bg-white border-r pt-12 md:pt-4 transition-transform duration-300 z-40 shadow-md flex flex-col h-screen", // flex-col + h-screen ensures full height
+          isMobile
+            ? cn(
+                "fixed top-0 left-0 h-full w-64 overflow-auto",
+                open ? "translate-x-0" : "-translate-x-full"
+              )
+            : "hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-64"
+        )}
+      >
+        {/* Logo/Header */}
+        {!isMobile && (
+          <div className="flex items-center p-4 mb-6 flex-shrink-0">
+            <Calendar className="h-8 w-8 text-primary" />
+            <h1 className="ml-2 text-xl font-semibold">Leave Portal</h1>
+          </div>
+        )}
+
+        {/* Navigation */}
+        <ScrollArea className="flex-1 px-2 overflow-y-auto">
+          <nav className="space-y-1">
+            {allowedNavigation.map((item) => {
+              const active = location.pathname === item.href;
+              return (
+                <Button
+                  key={item.name}
+                  variant={active ? "secondary" : "ghost"}
+                  className="w-full justify-start"
+                  asChild
+                  onClick={() => isMobile && setOpen(false)}
+                >
+                  <Link to={item.href} className="flex items-center">
+                    <item.icon className="mr-3 h-5 w-5" />
+                    {item.name}
+                  </Link>
+                </Button>
+              );
+            })}
+          </nav>
+        </ScrollArea>
+
+        {/* User info + logout pinned bottom */}
+        <div className="mt-auto p-4 border-t flex-shrink-0">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center">
+              <User className="w-5 h-5 text-primary-foreground" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
+            <div className="min-w-0">
+              <p className="font-semibold truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-muted-foreground truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {user?.role}
               </p>
             </div>
           </div>
-          
           <Button
             variant="ghost"
             className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
             onClick={logout}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
+            <LogOut className="mr-2 h-5 w-5" /> Sign Out
           </Button>
         </div>
       </div>
-    </div>
+
+      {/* Mobile sidebar backdrop */}
+      {isMobile && open && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40"
+          onClick={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
