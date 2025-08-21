@@ -1,119 +1,149 @@
-import { Response } from 'express';
-import { z } from 'zod';
-import { prisma } from '../lib/prisma';
-import { createError } from '../middleware/errorHandler';
-import { AuthRequest } from '../middleware/auth';
-import { UserRole } from '@prisma/client';
+import { Request, Response } from "express";
+import { prisma } from "../lib/prisma";
+import bcrypt from "bcryptjs";
+import { z } from "zod";
+import { UserRole } from "@prisma/client";
+import { AuthRequest } from "../middleware/auth";
 
-const updateUserSchema = z.object({
-  firstName: z.string().min(1).optional(),
-  lastName: z.string().min(1).optional(),
-  role: z.nativeEnum(UserRole).optional(),
-  managerId: z.string().optional(),
+// ================== Validation Schema ==================
+const createUserSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  username: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6).optional(), // optional, defaults to username
+  employeeId: z.string().min(1),
+  role: z.nativeEnum(UserRole).default("EMPLOYEE"),
   departmentId: z.string().optional(),
-  isActive: z.boolean().optional(),
+  managerId: z.string().optional(),
+  profileImage: z.string().optional(),
 });
 
-class UserController {
-  async getUsers(req: AuthRequest, res: Response) {
-    const { page = '1', limit = '10', search } = req.query;
-    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+// ================== Controller ==================
+export const userController = {
+  // Create new user
+  async createUser(req: AuthRequest, res: Response) {
+    try {
+      const data = createUserSchema.parse(req.body);
 
-    let where: any = {};
-    if (search) {
-      where = {
-        OR: [
-          { firstName: { contains: search, mode: 'insensitive' } },
-          { lastName: { contains: search, mode: 'insensitive' } },
-          { email: { contains: search, mode: 'insensitive' } },
-          { employeeId: { contains: search, mode: 'insensitive' } },
-          { username: { contains: search, mode: 'insensitive' } },
-        ],
-      };
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: data.email },
+            { username: data.username },
+            { employeeId: data.employeeId },
+          ],
+        },
+      });
+
+      if (existingUser) {
+        return res.status(400).json({ error: "User with this email, username, or employeeId already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(data.password ?? data.username, 10);
+
+      const user = await prisma.user.create({
+        data: { ...data, password: hashedPassword },
+        include: {
+          department: true,
+          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      });
+
+      // ✅ Initialize leave balances for the new user
+      await userController.initializeLeaveBalances(user.id);
+
+      return res.status(201).json(user);
+    } catch (error: any) {
+      console.error(error);
+      return res.status(500).json({ error: error.message });
     }
+  },
 
-    const [users, total] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          employeeId: true,
-          role: true,
-          isActive: true,
-          joinDate: true,
-          department: { select: { id: true, name: true } },
-          manager: { select: { id: true, firstName: true, lastName: true } },
-          createdAt: true,
+  async getUsers(req: Request, res: Response) {
+    try {
+      const users = await prisma.user.findMany({
+        include: {
+          department: true,
+          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: parseInt(limit as string),
-      }),
-      prisma.user.count({ where }),
-    ]);
+      });
+      return res.json(users);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
 
-    res.json({
-      users,
-      pagination: {
-        total,
-        page: parseInt(page as string),
-        limit: parseInt(limit as string),
-        totalPages: Math.ceil(total / parseInt(limit as string)),
-      },
-    });
-  }
-
-  async getUserById(req: AuthRequest, res: Response) {
-    const { id } = req.params;
-
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        department: true,
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
-        employees: { select: { id: true, firstName: true, lastName: true, email: true } },
-        leaveBalances: {
-          where: { year: new Date().getFullYear() },
-          include: { leavePolicy: true },
+  async getUserById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await prisma.user.findUnique({
+        where: { id },
+        include: {
+          department: true,
+          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+          leaveBalances: { where: { year: new Date().getFullYear() }, include: { leavePolicy: true } },
         },
-      },
-    });
+      });
 
-    if (!user) throw createError('User not found', 404);
+      if (!user) return res.status(404).json({ error: "User not found" });
 
-    res.json({ user });
-  }
+      return res.json(user);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
 
   async updateUser(req: AuthRequest, res: Response) {
-    const { id } = req.params;
-    const data = updateUserSchema.parse(req.body);
+    try {
+      const { id } = req.params;
+      const data = req.body;
 
-    const user = await prisma.user.update({
-      where: { id },
-      data,
-      include: {
-        department: true,
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
-      },
-    });
+      if (data.password) {
+        data.password = await bcrypt.hash(data.password, 10);
+      }
 
-    res.json({ user });
-  }
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data,
+        include: {
+          department: true,
+          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      });
+
+      return res.json(updatedUser);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
 
   async deleteUser(req: AuthRequest, res: Response) {
-    const { id } = req.params;
+    try {
+      const { id } = req.params;
+      await prisma.user.delete({ where: { id } });
+      return res.json({ message: "User deleted successfully" });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  },
 
-    await prisma.user.update({
-      where: { id },
-      data: { isActive: false },
+  // ✅ Helper function: Initialize leave balances
+  async initializeLeaveBalances(userId: string) {
+    const currentYear = new Date().getFullYear();
+    const policies = await prisma.leavePolicy.findMany({ where: { isActive: true } });
+
+    if (policies.length === 0) return;
+
+    await prisma.leaveBalance.createMany({
+      data: policies.map((policy) => ({
+        userId,
+        leavePolicyId: policy.id,
+        year: currentYear,
+        totalQuota: policy.annualQuota,
+        availableDays: policy.annualQuota,
+      })),
+      skipDuplicates: true,
     });
-
-    res.json({ message: 'User deactivated successfully' });
-  }
-}
-
-export const userController = new UserController();
+  },
+};

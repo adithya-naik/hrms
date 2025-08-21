@@ -63,35 +63,43 @@ class ReportController {
 
     res.json({ balances });
   }
-  async getDepartmentAnalysis(req: AuthRequest, res: Response) {
-    const { startDate, endDate } = req.query;
+ async getDepartmentAnalysis(req: Request, res: Response) {
+    try {
+      const { startDate, endDate } = req.query;
 
-    let where: any = {};
-    if (startDate && endDate) {
-      where.createdAt = {
-        gte: new Date(startDate as string),
-        lte: new Date(endDate as string),
-      };
+      const leaves = await prisma.leave.findMany({
+        where: {
+          createdAt: {
+            gte: startDate ? new Date(startDate as string) : new Date("2025-01-01T00:00:00.000Z"),
+            lte: endDate ? new Date(endDate as string) : new Date("2025-12-31T23:59:59.999Z"),
+          },
+        },
+        include: {
+          requester: {
+            select: { departmentId: true },
+          },
+        },
+      });
+
+      // Aggregate by departmentId
+      const analysis = leaves.reduce((acc, leave) => {
+        const deptId = leave.requester?.departmentId ?? "UNKNOWN";
+
+        if (!acc[deptId]) {
+          acc[deptId] = { count: 0, totalDays: 0 };
+        }
+
+        acc[deptId].count += 1;
+        acc[deptId].totalDays += leave.totalDays;
+
+        return acc;
+      }, {} as Record<string, { count: number; totalDays: number }>);
+
+      res.json({ analysis });
+    } catch (error) {
+      console.error("Error in getDepartmentAnalysis:", error);
+      res.status(500).json({ error: "Internal server error" });
     }
-
-    const analysis = await prisma.leave.groupBy({
-      by: ['departmentId'],
-      where,
-      _count: { id: true },
-      _sum: { totalDays: true },
-    });
-
-    const enriched = await Promise.all(
-      analysis.map(async (a) => {
-        const dept = await prisma.department.findUnique({
-          where: { id: a.departmentId },
-          select: { name: true },
-        });
-        return { ...a, departmentName: dept?.name || 'Unknown' };
-      })
-    );
-
-    res.json({ analysis: enriched });
   }
 
   async exportCSV(req: AuthRequest, res: Response) {

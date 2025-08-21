@@ -6,7 +6,8 @@ import { dashboardRoutes } from './dashboard';
 import { reportRoutes } from './reports';
 import { holidayRoutes } from './holidays';
 import { uploadRoutes } from './upload';
-
+import { departmentRoutes } from "./departments";
+import {settingsRoutes} from "./settings";
 const router = Router();
 
 router.use('/auth', authRoutes);
@@ -16,5 +17,6 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/reports', reportRoutes);
 router.use('/holidays', holidayRoutes);
 router.use('/upload', uploadRoutes);
-
+router.use("/departments", departmentRoutes);
+router.use("/settings", settingsRoutes);
 export { router as routes };

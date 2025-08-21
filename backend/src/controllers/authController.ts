@@ -48,31 +48,21 @@ class AuthController {
   async login(req: Request, res: Response) {
     const { username, password } = loginSchema.parse(req.body);
 
-    // Allow login with username OR email (user can type either into "username" field)
     const user = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username },
-          { email: username },
-        ],
+        OR: [{ username }, { email: username }],
         isActive: true,
       },
       include: {
         department: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
 
-    if (!user) {
-      throw createError('Invalid credentials', 401);
-    }
+    if (!user) throw createError('Invalid credentials', 401);
 
     const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      throw createError('Invalid credentials', 401);
-    }
+    if (!isValidPassword) throw createError('Invalid credentials', 401);
 
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role, username: user.username },
@@ -87,19 +77,7 @@ class AuthController {
     );
 
     res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        employeeId: user.employeeId,
-        role: user.role,
-        department: user.department,
-        manager: user.manager,
-        profileImage: user.profileImage,
-        joinDate: user.joinDate,
-      },
+      user,
       token,
       refreshToken,
     });
@@ -108,14 +86,9 @@ class AuthController {
   async register(req: Request, res: Response) {
     const data = registerSchema.parse(req.body);
 
-    // Uniqueness checks
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          { username: data.username },
-          { email: data.email },
-          { employeeId: data.employeeId },
-        ],
+        OR: [{ username: data.username }, { email: data.email }, { employeeId: data.employeeId }],
       },
     });
 
@@ -128,22 +101,10 @@ class AuthController {
     const hashedPassword = await bcrypt.hash(data.password, 12);
 
     const user = await prisma.user.create({
-      data: {
-        username: data.username,
-        email: data.email,
-        password: hashedPassword,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        employeeId: data.employeeId,
-        departmentId: data.departmentId,
-        managerId: data.managerId,
-        joinDate: data.joinDate || undefined, // schema default now() if undefined
-      },
+      data: { ...data, password: hashedPassword },
       include: {
         department: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
 
@@ -155,22 +116,7 @@ class AuthController {
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
-    res.status(201).json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        employeeId: user.employeeId,
-        role: user.role,
-        department: user.department,
-        manager: user.manager,
-        profileImage: user.profileImage,
-        joinDate: user.joinDate,
-      },
-      token,
-    });
+    res.status(201).json({ user, token });
   }
 
   async getProfile(req: AuthRequest, res: Response) {
@@ -178,36 +124,14 @@ class AuthController {
       where: { id: req.user!.id },
       include: {
         department: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
-        leaveBalances: {
-          where: { year: new Date().getFullYear() },
-          include: { leavePolicy: true },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+        leaveBalances: { where: { year: new Date().getFullYear() }, include: { leavePolicy: true } },
       },
     });
 
-    if (!user) {
-      throw createError('User not found', 404);
-    }
+    if (!user) throw createError('User not found', 404);
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        employeeId: user.employeeId,
-        role: user.role,
-        department: user.department,
-        manager: user.manager,
-        profileImage: user.profileImage,
-        joinDate: user.joinDate,
-        leaveBalances: user.leaveBalances,
-      },
-    });
+    res.json({ user });
   }
 
   async updateProfile(req: AuthRequest, res: Response) {
@@ -217,9 +141,7 @@ class AuthController {
       const existingUser = await prisma.user.findFirst({
         where: { email: data.email, id: { not: req.user!.id } },
       });
-      if (existingUser) {
-        throw createError('Email already exists', 409);
-      }
+      if (existingUser) throw createError('Email already exists', 409);
     }
 
     const user = await prisma.user.update({
@@ -227,32 +149,15 @@ class AuthController {
       data,
       include: {
         department: true,
-        manager: {
-          select: { id: true, firstName: true, lastName: true, email: true },
-        },
+        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     });
 
-    res.json({
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        employeeId: user.employeeId,
-        role: user.role,
-        department: user.department,
-        manager: user.manager,
-        profileImage: user.profileImage,
-        joinDate: user.joinDate,
-      },
-    });
+    res.json({ user });
   }
 
   async changePassword(req: AuthRequest, res: Response) {
     const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
-
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) throw createError('User not found', 404);
 
@@ -260,10 +165,7 @@ class AuthController {
     if (!isValidPassword) throw createError('Current password is incorrect', 400);
 
     const hashedPassword = await bcrypt.hash(newPassword, 12);
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { password: hashedPassword },
-    });
+    await prisma.user.update({ where: { id: req.user!.id }, data: { password: hashedPassword } });
 
     res.json({ message: 'Password updated successfully' });
   }
@@ -273,18 +175,12 @@ class AuthController {
     if (!refreshToken) throw createError('Refresh token is required', 400);
 
     try {
-      const decoded = jwt.verify(
-        refreshToken,
-        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!
-      ) as any;
-
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!) as any;
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
         include: {
           department: true,
-          manager: {
-            select: { id: true, firstName: true, lastName: true, email: true },
-          },
+          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
         },
       });
 
@@ -296,22 +192,7 @@ class AuthController {
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
-      res.json({
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          employeeId: user.employeeId,
-          role: user.role,
-          department: user.department,
-          manager: user.manager,
-          profileImage: user.profileImage,
-          joinDate: user.joinDate,
-        },
-        token: newToken,
-      });
+      res.json({ user, token: newToken });
     } catch {
       throw createError('Invalid refresh token', 401);
     }
@@ -320,7 +201,6 @@ class AuthController {
   private async initializeLeaveBalances(userId: string) {
     const currentYear = new Date().getFullYear();
     const policies = await prisma.leavePolicy.findMany({ where: { isActive: true } });
-
     if (policies.length === 0) return;
 
     await prisma.leaveBalance.createMany({
