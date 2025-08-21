@@ -1,10 +1,42 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import { RootState } from '../index';
+// src/redux/api/leaveApi.ts
+import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { RootState } from "../index";
 
-// Types
+// ---------------- Types ----------------
+export interface Leave {
+  id: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  status: string;
+  requester?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+export interface GetLeavesResponse {
+  leaves: Leave[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export interface LeavePolicy {
   id: string;
-  leaveType: "SICK" | "CASUAL" | "VACATION" | "ACADEMIC" | "COMP_OFF" | "WFH";
+  leaveType:
+    | "SICK"
+    | "CASUAL"
+    | "VACATION"
+    | "ACADEMIC"
+    | "COMP_OFF"
+    | "WFH";
   annualQuota: number;
   maxConsecutiveDays?: number | null;
   minDaysNotice: number;
@@ -15,110 +47,135 @@ export interface LeavePolicy {
   isActive: boolean;
 }
 
+// ---------------- API ----------------
 export const leaveApi = createApi({
-  reducerPath: 'leaveApi',
+  reducerPath: "leaveApi",
   baseQuery: fetchBaseQuery({
-    baseUrl: 'http://localhost:5000/api/leaves',
+    baseUrl: "http://localhost:5000/api/leaves",
     prepareHeaders: (headers, { getState }) => {
       const token = (getState() as RootState).auth.token;
       if (token) {
-        headers.set('authorization', `Bearer ${token}`);
+        headers.set("authorization", `Bearer ${token}`);
       }
       return headers;
     },
   }),
-  tagTypes: ['Leave', 'LeaveBalance', 'TeamLeave', 'LeavePolicy'],
+  tagTypes: ["Leave", "LeaveBalance", "TeamLeave", "LeavePolicy"],
   endpoints: (builder) => ({
     // ---- Leave Endpoints ----
-    getLeaves: builder.query<any, any>({
-      query: (params) => ({
-        url: '',
-        params,
-      }),
-      providesTags: ['Leave'],
+    getLeaves: builder.query<
+      GetLeavesResponse,
+      { status?: string; page?: number; limit?: number }
+    >({
+      query: ({ status, page = 1, limit = 10 }) => {
+        const params = new URLSearchParams();
+        if (status) params.append("status", status);
+        params.append("page", String(page));
+        params.append("limit", String(limit));
+        return { url: "", params };
+      },
+      providesTags: ["Leave"],
     }),
+
     createLeave: builder.mutation<any, any>({
       query: (leaveData) => ({
-        url: '',
-        method: 'POST',
+        url: "",
+        method: "POST",
         body: leaveData,
       }),
-      invalidatesTags: ['Leave', 'LeaveBalance'],
+      invalidatesTags: ["Leave", "LeaveBalance"],
     }),
+
     getLeaveBalances: builder.query<any, number>({
       query: (year) => ({
-        url: '/balances',
+        url: "/balances",
         params: { year },
       }),
-      providesTags: ['LeaveBalance'],
+      providesTags: ["LeaveBalance"],
     }),
+
     approveLeave: builder.mutation<any, string>({
       query: (id) => ({
         url: `/${id}/approve`,
-        method: 'PUT',
+        method: "PUT",
       }),
-      invalidatesTags: ['Leave', 'TeamLeave', 'LeaveBalance'],
+      invalidatesTags: ["Leave", "TeamLeave", "LeaveBalance"],
     }),
-    rejectLeave: builder.mutation<any, { id: string; rejectionReason: string }>({
+
+    rejectLeave: builder.mutation<
+      any,
+      { id: string; rejectionReason: string }
+    >({
       query: ({ id, rejectionReason }) => ({
         url: `/${id}/reject`,
-        method: 'PUT',
+        method: "PUT",
         body: { rejectionReason },
       }),
-      invalidatesTags: ['Leave', 'TeamLeave', 'LeaveBalance'],
+      invalidatesTags: ["Leave", "TeamLeave", "LeaveBalance"],
     }),
+
     cancelLeave: builder.mutation<any, string>({
       query: (id) => ({
         url: `/${id}/cancel`,
-        method: 'PUT',
+        method: "PUT",
       }),
-      invalidatesTags: ['Leave', 'LeaveBalance'],
+      invalidatesTags: ["Leave", "LeaveBalance"],
     }),
+
     getTeamLeaves: builder.query<any, any>({
       query: (params) => ({
-        url: '/team',
+        url: "/team",
         params,
       }),
-      providesTags: ['TeamLeave'],
+      providesTags: ["TeamLeave"],
     }),
 
     // ---- Leave Policy Endpoints ----
     getLeavePolicies: builder.query<{ policies: LeavePolicy[] }, void>({
-      query: () => '/policies',
-      providesTags: ['LeavePolicy'],
+      query: () => "/policies",
+      providesTags: ["LeavePolicy"],
     }),
-    createLeavePolicy: builder.mutation<{ policy: LeavePolicy }, Partial<LeavePolicy>>({
+
+    createLeavePolicy: builder.mutation<
+      { policy: LeavePolicy },
+      Partial<LeavePolicy>
+    >({
       query: (body) => ({
-        url: '/policies',
-        method: 'POST',
+        url: "/policies",
+        method: "POST",
         body,
       }),
-      invalidatesTags: ['LeavePolicy'],
+      invalidatesTags: ["LeavePolicy"],
     }),
-    updateLeavePolicy: builder.mutation<{ policy: LeavePolicy }, { id: string; body: Partial<LeavePolicy> }>({
+
+    updateLeavePolicy: builder.mutation<
+      { policy: LeavePolicy },
+      { id: string; body: Partial<LeavePolicy> }
+    >({
       query: ({ id, body }) => ({
         url: `/policies/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body,
       }),
-      invalidatesTags: ['LeavePolicy'],
+      invalidatesTags: ["LeavePolicy"],
     }),
-deleteLeavePolicy: builder.mutation<{ success: boolean }, { id: string }>({
-  query: ({ id }) => ({
-    url: `/policies/${id}`,
-    method: "DELETE",
-  }),
-  invalidatesTags: (result, error, { id }) => [
-    { type: "LeavePolicy", id },
-    { type: "LeavePolicy", id: "LIST" },
-  ],
-}),
 
+    deleteLeavePolicy: builder.mutation<{ success: boolean }, { id: string }>({
+      query: ({ id }) => ({
+        url: `/policies/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { id }) => [
+        { type: "LeavePolicy", id },
+        { type: "LeavePolicy", id: "LIST" },
+      ],
+    }),
   }),
 });
 
+// ---------------- Hooks ----------------
 export const {
-  // Leave
+  // Leaves
   useGetLeavesQuery,
   useCreateLeaveMutation,
   useGetLeaveBalancesQuery,
