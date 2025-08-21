@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { jwtVerify, createRemoteJWKSet, JWTPayload } from 'jose';
+import jwt from 'jsonwebtoken';
 import { config } from '../config/config';
 import { prisma } from '../lib/prisma';
 import { UserRole } from '@prisma/client';
@@ -7,13 +7,11 @@ import { UserRole } from '@prisma/client';
 interface AuthRequest extends Request {
   user?: {
     id: string;
-    auth0Id: string;
+    username: string;
     email: string;
     role: UserRole;
   };
 }
-
-const JWKS = createRemoteJWKSet(new URL(`https://${config.AUTH0_DOMAIN}/.well-known/jwks.json`));
 
 export const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -25,24 +23,19 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
 
     const token = authHeader.substring(7);
     
-    // Verify JWT with Auth0
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: `https://${config.AUTH0_DOMAIN}/`,
-      audience: config.AUTH0_AUDIENCE,
-    });
-
-    const auth0Id = payload.sub as string;
+    // Verify JWT token
+    const decoded = jwt.verify(token, config.JWT_SECRET) as any;
     
-    if (!auth0Id) {
+    if (!decoded.userId) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
     // Get user from database
     const user = await prisma.user.findUnique({
-      where: { auth0Id },
+      where: { id: decoded.userId },
       select: {
         id: true,
-        auth0Id: true,
+        username: true,
         email: true,
         role: true,
         isActive: true
@@ -57,8 +50,6 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);
-    console.error('Token verification failed:', error);
-
     return res.status(401).json({ error: 'Invalid token' });
   }
 };
@@ -72,7 +63,6 @@ export const authorize = (roles: UserRole[]) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
-console.log('\n\n\n\n\nUser role:\n\n\n\n', req.user.role, 'Allowed roles:', roles);
 
     next();
   };

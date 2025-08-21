@@ -22,8 +22,13 @@ export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (roles && user && !roles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+  // Role-based protection
+  if (roles && roles.length > 0 && user) {
+    const hasRole = roles.includes(user.role);
+    
+    if (!hasRole) {
+      return <Navigate to="/unauthorized" replace />;
+    }
   }
 
   return <>{children}</>;
