@@ -1,63 +1,85 @@
-import { useAuth0 } from '@auth0/auth0-react';
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '@/store';
 import { setCredentials, logout, setLoading } from '@/store/slices/authSlice';
-import { useLoginMutation } from '@/store/api/authApi';
+import { useLoginMutation, useRefreshTokenMutation, useGetProfileQuery } from '@/store/api/authApi';
 
 export const useAuth = () => {
-  const { user, getAccessTokenSilently, isAuthenticated, isLoading: auth0Loading, loginWithRedirect, logout: auth0Logout } = useAuth0();
   const dispatch = useDispatch();
-  const { user: appUser, isAuthenticated: isAppAuthenticated, isLoading } = useSelector((state: RootState) => state.auth);
+  const { user, token, refreshToken, isAuthenticated, isLoading } = useSelector((state: RootState) => state.auth);
   const [loginMutation] = useLoginMutation();
+  const [refreshTokenMutation] = useRefreshTokenMutation();
+
+  // Auto-fetch user profile if token exists but no user data
+  const { data: profileData, isLoading: profileLoading } = useGetProfileQuery(undefined, {
+    skip: !token || !!user,
+  });
 
   useEffect(() => {
-    const handleAuth = async () => {
-      if (isAuthenticated && user) {
-        try {
-          dispatch(setLoading(true));
-          const token = await getAccessTokenSilently();
-          
-          // Login/register user in our backend
-          const result = await loginMutation({
-            auth0Id: user.sub,
-            email: user.email,
-            role:user.role,
-          }).unwrap();
+    if (profileData?.user && !user) {
+      dispatch(setCredentials({
+        user: profileData.user,
+        token: token!,
+      }));
+    }
+  }, [profileData, user, token, dispatch]);
 
-          dispatch(setCredentials({
-            user: result.user,
-            token,
-          }));
-        } catch (error) {
-          console.error('Auth error:', error);
-          // If user doesn't exist in backend, redirect to registration
-          if (error.status === 404) {
-            // Handle registration flow
-            console.log('User needs to be registered');
+  // Auto-refresh token if it's about to expire
+  useEffect(() => {
+    const checkTokenExpiry = async () => {
+      if (token && refreshToken) {
+        try {
+          // Decode token to check expiry (simple check)
+          const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+          const currentTime = Date.now() / 1000;
+          
+          // If token expires in less than 5 minutes, refresh it
+          if (tokenPayload.exp - currentTime < 300) {
+            const result = await refreshTokenMutation(refreshToken).unwrap();
+            dispatch(setCredentials({
+              user: result.user,
+              token: result.token,
+            }));
           }
-        } finally {
-          dispatch(setLoading(false));
+        } catch (error) {
+          console.error('Token refresh failed:', error);
+          dispatch(logout());
         }
       }
     };
 
-    handleAuth();
-  }, [isAuthenticated, user, getAccessTokenSilently, dispatch, loginMutation]);
+    const interval = setInterval(checkTokenExpiry, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [token, refreshToken, refreshTokenMutation, dispatch]);
 
-  const login = () => {
-    loginWithRedirect();
+  const login = async (username: string, password: string) => {
+    try {
+      dispatch(setLoading(true));
+      const result = await loginMutation({ username, password }).unwrap();
+      dispatch(setCredentials({
+        user: result.user,
+        token: result.token,
+        refreshToken: result.refreshToken,
+      }));
+      return { success: true };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error?.data?.error || 'Login failed' 
+      };
+    } finally {
+      dispatch(setLoading(false));
+    }
   };
 
   const handleLogout = () => {
     dispatch(logout());
-    auth0Logout({ logoutParams: { returnTo: window.location.origin } });
   };
 
   return {
-    user: appUser,
-    isAuthenticated: isAppAuthenticated,
-    isLoading: isLoading || auth0Loading,
+    user,
+    isAuthenticated,
+    isLoading: isLoading || profileLoading,
     login,
     logout: handleLogout,
   };

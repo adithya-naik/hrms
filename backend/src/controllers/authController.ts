@@ -1,29 +1,38 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { createError } from '../middleware/errorHandler';
 import { AuthRequest } from '../middleware/auth';
 
 const loginSchema = z.object({
-  auth0Id: z.string(),
-  email: z.string().email(),
+  username: z.string().min(1, 'Username is required'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 const registerSchema = z.object({
-  auth0Id: z.string(),
-  email: z.string().email(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  employeeId: z.string().min(1),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  employeeId: z.string().min(1, 'Employee ID is required'),
   departmentId: z.string().optional(),
   managerId: z.string().optional(),
-  joinDate: z.string().transform((str) => new Date(str)),
+  joinDate: z.string().transform((str) => new Date(str)).optional(),
 });
 
 const updateProfileSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
   profileImage: z.string().optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
 });
 
 class AuthController {
@@ -32,14 +41,22 @@ class AuthController {
     this.register = this.register.bind(this);
     this.getProfile = this.getProfile.bind(this);
     this.updateProfile = this.updateProfile.bind(this);
+    this.changePassword = this.changePassword.bind(this);
+    this.refreshToken = this.refreshToken.bind(this);
   }
 
   async login(req: Request, res: Response) {
-    const { auth0Id, email } = loginSchema.parse(req.body);
+    const { username, password } = loginSchema.parse(req.body);
 
-    // Try to find user by auth0Id
-    let user = await prisma.user.findUnique({
-      where: { auth0Id },
+    // Find user by username or email
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username },
+          { email: username }, // Allow login with email as username
+        ],
+        isActive: true,
+      },
       include: {
         department: true,
         manager: {
@@ -53,80 +70,39 @@ class AuthController {
       },
     });
 
-    // If not found by auth0Id, try to find by email to avoid duplicates
     if (!user) {
-      user = await prisma.user.findUnique({
-        where: { email },
-        include: {
-          department: true,
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      // If found by email but no auth0Id, update user with auth0Id
-      if (user) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: { auth0Id },
-          include: {
-            department: true,
-            manager: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-        });
-      }
+      throw createError('Invalid credentials', 401);
     }
 
-    // If no user found, create a new user
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          auth0Id,
-          email,
-          firstName: 'New',
-          lastName: 'User',
-          employeeId: 'EMP' + Math.floor(Math.random() * 100000),
-          role: 'EMPLOYEE',
-          joinDate: new Date(),
-          isActive: true,
-        },
-        include: {
-          department: true,
-          manager: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-      });
-
-      await this.initializeLeaveBalances(user.id);
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.password || '');
+    if (!isValidPassword) {
+      throw createError('Invalid credentials', 401);
     }
 
-    if (!user.isActive) {
-      throw createError('Account is deactivated', 403);
-    }
-console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role,
+        username: user.username 
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    );
+
+    // Generate refresh token
+    const refreshToken = jwt.sign(
+      { userId: user.id },
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
+    );
+
     res.json({
       user: {
         id: user.id,
-        auth0Id: user.auth0Id,
+        username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -137,6 +113,8 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
         profileImage: user.profileImage,
         joinDate: user.joinDate,
       },
+      token,
+      refreshToken,
     });
   }
 
@@ -147,7 +125,7 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { auth0Id: data.auth0Id },
+          { username: data.username },
           { email: data.email },
           { employeeId: data.employeeId },
         ],
@@ -155,11 +133,26 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
     });
 
     if (existingUser) {
-      throw createError('User already exists', 409);
+      if (existingUser.username === data.username) {
+        throw createError('Username already exists', 409);
+      }
+      if (existingUser.email === data.email) {
+        throw createError('Email already exists', 409);
+      }
+      if (existingUser.employeeId === data.employeeId) {
+        throw createError('Employee ID already exists', 409);
+      }
     }
 
+    // Hash password
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
     const user = await prisma.user.create({
-      data,
+      data: {
+        ...data,
+        password: hashedPassword,
+        joinDate: data.joinDate || new Date(),
+      },
       include: {
         department: true,
         manager: {
@@ -173,12 +166,25 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
       },
     });
 
+    // Initialize leave balances
     await this.initializeLeaveBalances(user.id);
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role,
+        username: user.username 
+      },
+      process.env.JWT_SECRET!,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+    );
 
     res.status(201).json({
       user: {
         id: user.id,
-        auth0Id: user.auth0Id,
+        username: user.username,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
@@ -189,6 +195,7 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
         profileImage: user.profileImage,
         joinDate: user.joinDate,
       },
+      token,
     });
   }
 
@@ -216,11 +223,40 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
       throw createError('User not found', 404);
     }
 
-    res.json({ user });
+    res.json({ 
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        employeeId: user.employeeId,
+        role: user.role,
+        department: user.department,
+        manager: user.manager,
+        profileImage: user.profileImage,
+        joinDate: user.joinDate,
+        leaveBalances: user.leaveBalances,
+      }
+    });
   }
 
   async updateProfile(req: AuthRequest, res: Response) {
     const data = updateProfileSchema.parse(req.body);
+
+    // Check if email is being updated and if it already exists
+    if (data.email) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email: data.email,
+          id: { not: req.user!.id },
+        },
+      });
+
+      if (existingUser) {
+        throw createError('Email already exists', 409);
+      }
+    }
 
     const user = await prisma.user.update({
       where: { id: req.user!.id },
@@ -238,7 +274,114 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
       },
     });
 
-    res.json({ user });
+    res.json({ 
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        employeeId: user.employeeId,
+        role: user.role,
+        department: user.department,
+        manager: user.manager,
+        profileImage: user.profileImage,
+        joinDate: user.joinDate,
+      }
+    });
+  }
+
+  async changePassword(req: AuthRequest, res: Response) {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+    });
+
+    if (!user) {
+      throw createError('User not found', 404);
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password || '');
+    if (!isValidPassword) {
+      throw createError('Current password is incorrect', 400);
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    await prisma.user.update({
+      where: { id: req.user!.id },
+      data: { password: hashedPassword },
+    });
+
+    res.json({ message: 'Password updated successfully' });
+  }
+
+  async refreshToken(req: Request, res: Response) {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      throw createError('Refresh token is required', 400);
+    }
+
+    try {
+      const decoded = jwt.verify(
+        refreshToken, 
+        process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET!
+      ) as any;
+
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: {
+          department: true,
+          manager: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!user || !user.isActive) {
+        throw createError('Invalid refresh token', 401);
+      }
+
+      // Generate new access token
+      const newToken = jwt.sign(
+        { 
+          userId: user.id, 
+          email: user.email, 
+          role: user.role,
+          username: user.username 
+        },
+        process.env.JWT_SECRET!,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+      );
+
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          employeeId: user.employeeId,
+          role: user.role,
+          department: user.department,
+          manager: user.manager,
+          profileImage: user.profileImage,
+          joinDate: user.joinDate,
+        },
+        token: newToken,
+      });
+    } catch (error) {
+      throw createError('Invalid refresh token', 401);
+    }
   }
 
   private async initializeLeaveBalances(userId: string) {
@@ -249,7 +392,7 @@ console.log('\n\n\nUser found or created in backemd :\n\n\n\n', user);
 
     const balances = policies.map((policy) => ({
       userId,
-      leaveType: policy.leaveType,
+      leavePolicyId: policy.id,
       year: currentYear,
       totalQuota: policy.annualQuota,
       availableDays: policy.annualQuota,

@@ -29,6 +29,13 @@ export const authApi = createApi({
         body: userData,
       }),
     }),
+    refreshToken: builder.mutation({
+      query: (refreshToken) => ({
+        url: '/refresh-token',
+        method: 'POST',
+        body: { refreshToken },
+      }),
+    }),
     getProfile: builder.query({
       query: () => '/me',
       providesTags: ['User'],
@@ -41,12 +48,21 @@ export const authApi = createApi({
       }),
       invalidatesTags: ['User'],
     }),
+    changePassword: builder.mutation({
+      query: (passwordData) => ({
+        url: '/change-password',
+        method: 'PUT',
+        body: passwordData,
+      }),
+    }),
   }),
 });
 
 export const {
   useLoginMutation,
   useRegisterMutation,
+  useRefreshTokenMutation,
   useGetProfileQuery,
   useUpdateProfileMutation,
+  useChangePasswordMutation,
 } = authApi;
