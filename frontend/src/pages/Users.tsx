@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,11 +9,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Search, Plus, Edit, Trash2, UserPlus, Filter } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
+
+import {
+  useGetUsersQuery,
+  useCreateUserMutation,
+  useUpdateUserMutation,
+  useDeleteUserMutation,
+  useGetDepartmentsQuery,
+  useGetManagersQuery,
+} from '../store/api/userApi';
 
 const userSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -33,6 +44,20 @@ export default function Users() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
+  // API hooks
+  const { data, isLoading, isError } = useGetUsersQuery({
+    search,
+    role: roleFilter !== 'all' ? roleFilter : undefined,
+    department: departmentFilter !== 'all' ? departmentFilter : undefined,
+  });
+
+  const { data: departments = [] } = useGetDepartmentsQuery();
+  const { data: managers = [] } = useGetManagersQuery();
+
+  const [createUser] = useCreateUserMutation();
+  const [updateUser] = useUpdateUserMutation();
+  const [deleteUser] = useDeleteUserMutation();
+
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -45,60 +70,7 @@ export default function Users() {
     },
   });
 
-  // Mock data - replace with actual API calls
-  const users = [
-    {
-      id: '1',
-      firstName: 'John',
-      lastName: 'Doe',
-      username: 'johndoe',
-      email: 'john.doe@company.com',
-      employeeId: 'EMP001',
-      role: 'EMPLOYEE',
-      department: { name: 'Engineering' },
-      manager: { firstName: 'Jane', lastName: 'Smith' },
-      isActive: true,
-      joinDate: '2023-01-15',
-      createdAt: '2023-01-15',
-    },
-    {
-      id: '2',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      username: 'janesmith',
-      email: 'jane.smith@company.com',
-      employeeId: 'EMP002',
-      role: 'MANAGER',
-      department: { name: 'Engineering' },
-      manager: null,
-      isActive: true,
-      joinDate: '2022-06-01',
-      createdAt: '2022-06-01',
-    },
-    {
-      id: '3',
-      firstName: 'Bob',
-      lastName: 'Wilson',
-      username: 'bobwilson',
-      email: 'bob.wilson@company.com',
-      employeeId: 'EMP003',
-      role: 'HR',
-      department: { name: 'Human Resources' },
-      manager: null,
-      isActive: true,
-      joinDate: '2022-03-10',
-      createdAt: '2022-03-10',
-    },
-  ];
-
-  const departments = [
-    { id: '1', name: 'Engineering' },
-    { id: '2', name: 'Human Resources' },
-    { id: '3', name: 'Marketing' },
-    { id: '4', name: 'Sales' },
-  ];
-
-  const managers = users.filter(user => ['MANAGER', 'HR', 'ADMIN'].includes(user.role));
+  const users = data?.users || [];
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -117,8 +89,11 @@ export default function Users() {
 
   const onSubmit = async (data: UserFormData) => {
     try {
-      // Implement user creation/update logic
-      console.log('User data:', data);
+      if (selectedUser) {
+        await updateUser({ id: selectedUser.id, ...data }).unwrap();
+      } else {
+        await createUser(data).unwrap();
+      }
       setIsCreateDialogOpen(false);
       form.reset();
     } catch (error) {
@@ -141,23 +116,16 @@ export default function Users() {
     setIsCreateDialogOpen(true);
   };
 
-  const handleDelete = (userId: string) => {
-    // Implement user deletion logic
-    console.log('Delete user:', userId);
+  const handleDelete = async (userId: string) => {
+    try {
+      await deleteUser(userId).unwrap();
+    } catch (error) {
+      console.error('Error deleting user:', error);
+    }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.firstName.toLowerCase().includes(search.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase()) ||
-      user.employeeId.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesDepartment = departmentFilter === 'all' || user.department?.name === departmentFilter;
-    
-    return matchesSearch && matchesRole && matchesDepartment;
-  });
+  if (isLoading) return <div>Loading users...</div>;
+  if (isError) return <div className="text-red-500">Failed to load users</div>;
 
   return (
     <div className="space-y-6">
@@ -201,7 +169,6 @@ export default function Users() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="lastName"
@@ -231,7 +198,6 @@ export default function Users() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="employeeId"
@@ -285,7 +251,6 @@ export default function Users() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="departmentId"
@@ -410,25 +375,19 @@ export default function Users() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div>
                       <div className="font-medium">
                         {user.firstName} {user.lastName}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        {user.email}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {user.employeeId}
-                      </div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
+                      <div className="text-xs text-muted-foreground">{user.employeeId}</div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getRoleColor(user.role)}>
-                      {user.role}
-                    </Badge>
+                    <Badge className={getRoleColor(user.role)}>{user.role}</Badge>
                   </TableCell>
                   <TableCell>{user.department?.name || 'N/A'}</TableCell>
                   <TableCell>
@@ -442,11 +401,7 @@ export default function Users() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(user)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleEdit(user)}>
                         <Edit className="h-4 w-4" />
                       </Button>
                       <Button
@@ -464,7 +419,7 @@ export default function Users() {
             </TableBody>
           </Table>
 
-          {filteredUsers.length === 0 && (
+          {users.length === 0 && (
             <div className="text-center py-12">
               <UserPlus className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium mb-2">No users found</h3>

@@ -7,7 +7,7 @@ class ReportController {
     const { startDate, endDate, departmentId } = req.query;
 
     let where: any = {};
-    
+
     if (startDate && endDate) {
       where.createdAt = {
         gte: new Date(startDate as string),
@@ -63,6 +63,36 @@ class ReportController {
 
     res.json({ balances });
   }
+  async getDepartmentAnalysis(req: AuthRequest, res: Response) {
+    const { startDate, endDate } = req.query;
+
+    let where: any = {};
+    if (startDate && endDate) {
+      where.createdAt = {
+        gte: new Date(startDate as string),
+        lte: new Date(endDate as string),
+      };
+    }
+
+    const analysis = await prisma.leave.groupBy({
+      by: ['departmentId'],
+      where,
+      _count: { id: true },
+      _sum: { totalDays: true },
+    });
+
+    const enriched = await Promise.all(
+      analysis.map(async (a) => {
+        const dept = await prisma.department.findUnique({
+          where: { id: a.departmentId },
+          select: { name: true },
+        });
+        return { ...a, departmentName: dept?.name || 'Unknown' };
+      })
+    );
+
+    res.json({ analysis: enriched });
+  }
 
   async exportCSV(req: AuthRequest, res: Response) {
     const { type = 'leaves', startDate, endDate } = req.query;
@@ -72,7 +102,7 @@ class ReportController {
 
     if (type === 'leaves') {
       let where: any = {};
-      
+
       if (startDate && endDate) {
         where.createdAt = {
           gte: new Date(startDate as string),

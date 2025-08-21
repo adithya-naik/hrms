@@ -33,6 +33,8 @@ class LeaveController {
     this.getLeavePolicies = this.getLeavePolicies.bind(this);
     this.createLeavePolicy = this.createLeavePolicy.bind(this);
     this.updateLeavePolicy = this.updateLeavePolicy.bind(this);
+    this.deleteLeavePolicy = this.deleteLeavePolicy.bind(this);
+
   }
 
   async getLeaves(req: AuthRequest, res: Response) {
@@ -553,6 +555,15 @@ class LeaveController {
       logger.error('Failed to update leave balance', error);
     }
   }
+async deleteLeavePolicy(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+
+  await prisma.leavePolicy.delete({
+    where: { id },
+  });
+
+  res.json({ success: true });
+}
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
     const policy = await prisma.leavePolicy.findFirst({

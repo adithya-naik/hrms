@@ -8,10 +8,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings as SettingsIcon, Plus, Edit, Trash2, Calendar, Users, Shield } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Edit, Trash2, Calendar, Users } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useToast } from "@/components/ui/use-toast";
+
+import {
+  useGetLeavePoliciesQuery,
+  useCreateLeavePolicyMutation,
+  useUpdateLeavePolicyMutation,
+  useDeleteLeavePolicyMutation,
+} from "../store/api/leaveApi";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const leavePolicySchema = z.object({
   leaveType: z.enum(['SICK', 'CASUAL', 'VACATION', 'ACADEMIC', 'COMP_OFF', 'WFH']),
@@ -27,13 +47,14 @@ const leavePolicySchema = z.object({
 type LeavePolicyFormData = z.infer<typeof leavePolicySchema>;
 
 export default function Settings() {
+  const { toast } = useToast();
   const [isCreatePolicyDialogOpen, setIsCreatePolicyDialogOpen] = useState(false);
   const [selectedPolicy, setSelectedPolicy] = useState<any>(null);
 
-  const form = useForm<LeavePolicyFormData>({
+ const form = useForm<LeavePolicyFormData>({
     resolver: zodResolver(leavePolicySchema),
     defaultValues: {
-      leaveType: 'SICK',
+      leaveType: "SICK",
       annualQuota: 12,
       minDaysNotice: 1,
       requiresApproval: true,
@@ -42,45 +63,11 @@ export default function Settings() {
     },
   });
 
-  // Mock data - replace with actual API calls
-  const leavePolicies = [
-    {
-      id: '1',
-      leaveType: 'SICK',
-      annualQuota: 12,
-      maxConsecutiveDays: 5,
-      minDaysNotice: 0,
-      requiresApproval: true,
-      requiresDocument: true,
-      carryForwardAllowed: false,
-      maxCarryForward: null,
-      isActive: true,
-    },
-    {
-      id: '2',
-      leaveType: 'CASUAL',
-      annualQuota: 15,
-      maxConsecutiveDays: 3,
-      minDaysNotice: 1,
-      requiresApproval: true,
-      requiresDocument: false,
-      carryForwardAllowed: true,
-      maxCarryForward: 5,
-      isActive: true,
-    },
-    {
-      id: '3',
-      leaveType: 'VACATION',
-      annualQuota: 20,
-      maxConsecutiveDays: 10,
-      minDaysNotice: 7,
-      requiresApproval: true,
-      requiresDocument: false,
-      carryForwardAllowed: true,
-      maxCarryForward: 10,
-      isActive: true,
-    },
-  ];
+  const { data,isLoading } = useGetLeavePoliciesQuery();
+   const leavePolicies = data?.policies ?? [];
+  const [createLeavePolicy] = useCreateLeavePolicyMutation();
+  const [updateLeavePolicy] = useUpdateLeavePolicyMutation();
+  const [deleteLeavePolicy] = useDeleteLeavePolicyMutation();
 
   const formatLeaveType = (type: string) => {
     return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
@@ -88,12 +75,28 @@ export default function Settings() {
 
   const onSubmit = async (data: LeavePolicyFormData) => {
     try {
-      // Implement policy creation/update logic
-      console.log('Policy data:', data);
+      if (selectedPolicy) {
+        await updateLeavePolicy({ id: selectedPolicy.id, body: data }).unwrap();
+        toast({
+          title: "Policy updated",
+          description: `${formatLeaveType(data.leaveType)} updated successfully.`,
+        });
+      } else {
+        await createLeavePolicy(data).unwrap();
+        toast({
+          title: "Policy created",
+          description: `${formatLeaveType(data.leaveType)} created successfully.`,
+        });
+      }
       setIsCreatePolicyDialogOpen(false);
       form.reset();
     } catch (error) {
-      console.error('Error saving policy:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Something went wrong while saving the policy.",
+      });
+      console.error("Error saving policy:", error);
     }
   };
 
@@ -112,9 +115,22 @@ export default function Settings() {
     setIsCreatePolicyDialogOpen(true);
   };
 
-  const handleDeletePolicy = (policyId: string) => {
-    // Implement policy deletion logic
-    console.log('Delete policy:', policyId);
+  const handleDeletePolicy = async (policyId: string) => {
+    try {
+      // ✅ Fix: wrap in object since mutation expects { id }
+      await deleteLeavePolicy({ id: policyId }).unwrap();
+      toast({
+        title: "Policy deleted",
+        description: "The leave policy was deleted successfully.",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete the leave policy.",
+      });
+      console.error("Error deleting policy:", error);
+    }
   };
 
   return (
@@ -124,6 +140,7 @@ export default function Settings() {
         <p className="text-muted-foreground">Manage system settings and configurations</p>
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue="leave-policies" className="space-y-6">
         <TabsList>
           <TabsTrigger value="leave-policies" className="flex items-center gap-2">
@@ -140,6 +157,7 @@ export default function Settings() {
           </TabsTrigger>
         </TabsList>
 
+        {/* Leave Policies Tab */}
         <TabsContent value="leave-policies">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -170,6 +188,7 @@ export default function Settings() {
                   </DialogHeader>
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      {/* Leave Type + Annual Quota */}
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
@@ -216,6 +235,7 @@ export default function Settings() {
                         />
                       </div>
 
+                      {/* Max Consecutive + Min Notice */}
                       <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
@@ -254,6 +274,7 @@ export default function Settings() {
                         />
                       </div>
 
+                      {/* Switches */}
                       <div className="space-y-4">
                         <FormField
                           control={form.control}
@@ -353,6 +374,8 @@ export default function Settings() {
                 </DialogContent>
               </Dialog>
             </CardHeader>
+
+            {/* Table */}
             <CardContent>
               <Table>
                 <TableHeader>
@@ -404,14 +427,38 @@ export default function Settings() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeletePolicy(policy.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>
+                                  Delete Leave Policy
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete <b>{formatLeaveType(policy.leaveType)}</b>? 
+                                  This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleDeletePolicy(policy.id)}
+                                  className="bg-red-600 text-white hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -422,6 +469,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* Departments */}
         <TabsContent value="departments">
           <Card>
             <CardHeader>
@@ -436,6 +484,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
 
+        {/* System Settings */}
         <TabsContent value="system">
           <Card>
             <CardHeader>

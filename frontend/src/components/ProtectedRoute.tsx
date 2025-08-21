@@ -1,35 +1,26 @@
-import { useAuth } from '@/hooks/useAuth';
+import React from 'react';
+import { useSelector } from 'react-redux';
 import { Navigate, useLocation } from 'react-router-dom';
+import { RootState } from '@/store';
 
-interface ProtectedRouteProps {
+type Role = 'EMPLOYEE' | 'MANAGER' | 'HR' | 'ADMIN';
+
+interface Props {
   children: React.ReactNode;
-  roles?: string[];
+  roles?: Role[];
 }
 
-export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { isAuthenticated, user, isLoading } = useAuth();
+export const ProtectedRoute: React.FC<Props> = ({ children, roles }) => {
   const location = useLocation();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const { isAuthenticated, user } = useSelector((s: RootState) => s.auth);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Role-based protection
-  if (roles && roles.length > 0 && user) {
-    const hasRole = roles.includes(user.role);
-    
-    if (!hasRole) {
-      return <Navigate to="/unauthorized" replace />;
-    }
+  if (roles && user && !roles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return <>{children}</>;
-}
+};

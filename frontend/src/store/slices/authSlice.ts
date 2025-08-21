@@ -8,16 +8,8 @@ interface User {
   lastName: string;
   employeeId: string;
   role: 'EMPLOYEE' | 'MANAGER' | 'HR' | 'ADMIN';
-  department?: {
-    id: string;
-    name: string;
-  };
-  manager?: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
+  department?: { id: string; name: string };
+  manager?: { id: string; firstName: string; lastName: string; email: string };
   profileImage?: string;
   joinDate: string;
 }
@@ -47,7 +39,7 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.isAuthenticated = true;
       localStorage.setItem('auth_token', action.payload.token);
-      
+
       if (action.payload.refreshToken) {
         state.refreshToken = action.payload.refreshToken;
         localStorage.setItem('refresh_token', action.payload.refreshToken);

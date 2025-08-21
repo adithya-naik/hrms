@@ -12,9 +12,7 @@ export default function Unauthorized() {
             <ShieldX className="h-12 w-12 text-red-500" />
           </div>
           <CardTitle className="text-2xl font-bold text-red-600">Access Denied</CardTitle>
-          <CardDescription>
-            You don't have permission to access this page
-          </CardDescription>
+          <CardDescription>You don't have permission to access this page</CardDescription>
         </CardHeader>
         <CardContent className="text-center">
           <Button asChild>
