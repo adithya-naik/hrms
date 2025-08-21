@@ -98,11 +98,11 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link to="/leaves?status=APPROVED">
-              <Eye className="h-4 w-4 mr-2" />
-              View All
-            </Link>
-          </Button>
+  <Link to="/leaves?status=APPROVED&page=1&limit=10">
+    <Eye className="h-4 w-4 mr-2" />
+    View All
+  </Link>
+</Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
