@@ -12,11 +12,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { CalendarIcon, Upload, X, ArrowLeft } from 'lucide-react';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCreateLeaveMutation, useGetLeavePoliciesQuery } from '@/store/api/leaveApi';
 import { toast } from '@/components/ui/sonner';
+import { format, differenceInCalendarDays } from 'date-fns';
 
 const leaveSchema = z.object({
   leaveType: z.string().min(1, 'Please select a leave type'),
@@ -67,7 +67,28 @@ export default function ApplyLeave() {
     return diffDays;
   };
 
+  const watchedLeaveType = form.watch('leaveType');
+
+
+// Check 3-day rule
+const isCasualLeaveTooSoon = () => {
+  if (watchedLeaveType === 'CASUAL' && watchedStartDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(watchedStartDate);
+    start.setHours(0, 0, 0, 0);
+    const diffDays = differenceInCalendarDays(start, today);
+    return diffDays < 3;
+  }
+  return false;
+};
   const onSubmit = async (data: LeaveFormData) => {
+
+    if (isCasualLeaveTooSoon()) {
+    toast.error('Casual leave must be applied at least 3 days in advance.');
+    return;
+  }
+
   setIsSubmitting(true);
   try {
     // Create FormData to handle files
