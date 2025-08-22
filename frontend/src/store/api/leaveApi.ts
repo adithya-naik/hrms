@@ -133,7 +133,16 @@ export const leaveApi = createApi({
     // ---- Leave Policy Endpoints ----
     getLeavePolicies: builder.query<{ policies: LeavePolicy[] }, void>({
       query: () => "/policies",
-      providesTags: ["LeavePolicy"],
+      providesTags: (result) =>
+        result?.policies
+          ? [
+              ...result.policies.map((p) => ({
+                type: "LeavePolicy" as const,
+                id: p.id,
+              })),
+              { type: "LeavePolicy", id: "LIST" },
+            ]
+          : [{ type: "LeavePolicy", id: "LIST" }],
     }),
 
     createLeavePolicy: builder.mutation<
@@ -145,7 +154,7 @@ export const leaveApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: ["LeavePolicy"],
+      invalidatesTags: [{ type: "LeavePolicy", id: "LIST" }],
     }),
 
     updateLeavePolicy: builder.mutation<
@@ -157,7 +166,10 @@ export const leaveApi = createApi({
         method: "PUT",
         body,
       }),
-      invalidatesTags: ["LeavePolicy"],
+      invalidatesTags: (result, error, { id }) => [
+        { type: "LeavePolicy", id },
+        { type: "LeavePolicy", id: "LIST" },
+      ],
     }),
 
     deleteLeavePolicy: builder.mutation<{ success: boolean }, { id: string }>({
@@ -165,10 +177,7 @@ export const leaveApi = createApi({
         url: `/policies/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: "LeavePolicy", id },
-        { type: "LeavePolicy", id: "LIST" },
-      ],
+      invalidatesTags: [{ type: "LeavePolicy", id: "LIST" }],
     }),
   }),
 });
