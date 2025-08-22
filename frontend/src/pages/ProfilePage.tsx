@@ -89,42 +89,74 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
       </Card>
 
       {/* Manager & HR Info */}
-      {(user.manager || user.hr) && (
+      {/* Manager & HR Info */}
+      {user.role !== "ADMIN" && (user.manager || user.hr) && (
         <Card>
           <CardHeader>
             <CardTitle>Reporting To</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Manager */}
-            {user.manager && (
-              <div className="flex items-center gap-4">
-                <Avatar>
-                  {user.manager.profileImage ? (
-                    <AvatarImage src={user.manager.profileImage} alt="Manager" />
-                  ) : (
-                    <AvatarFallback>
-                      {user.manager.firstName?.[0]}
-                      {user.manager.lastName?.[0]}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div>
-                  <p className="font-semibold">Manager</p>
-                  <p>
-                    {user.manager.firstName} {user.manager.lastName}
-                  </p>
-                  <a
-                    href={`mailto:${user.manager.email}`}
-                    className="text-muted-foreground flex items-center gap-2 hover:underline"
-                  >
-                    <Mail className="h-4 w-4" /> {user.manager.email}
-                  </a>
-                </div>
-              </div>
+            {/* Employee: Manager + HR */}
+            {user.role === "EMPLOYEE" && (
+              <>
+                {user.manager && (
+                  <div className="flex items-center gap-4">
+                    <Avatar>
+                      {user.manager.profileImage ? (
+                        <AvatarImage src={user.manager.profileImage} alt="Manager" />
+                      ) : (
+                        <AvatarFallback>
+                          {user.manager.firstName?.[0]}
+                          {user.manager.lastName?.[0]}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">Manager</p>
+                      <p>
+                        {user.manager.firstName} {user.manager.lastName}
+                      </p>
+                      <a
+                        href={`mailto:${user.manager.email}`}
+                        className="text-muted-foreground flex items-center gap-2 hover:underline"
+                      >
+                        <Mail className="h-4 w-4" /> {user.manager.email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
+                {user.hr && (
+                  <div className="flex items-center gap-4">
+                    <Avatar>
+                      {user.hr.profileImage ? (
+                        <AvatarImage src={user.hr.profileImage} alt="HR" />
+                      ) : (
+                        <AvatarFallback>
+                          {user.hr.firstName?.[0]}
+                          {user.hr.lastName?.[0]}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold">HR</p>
+                      <p>
+                        {user.hr.firstName} {user.hr.lastName}
+                      </p>
+                      <a
+                        href={`mailto:${user.hr.email}`}
+                        className="text-muted-foreground flex items-center gap-2 hover:underline"
+                      >
+                        <Mail className="h-4 w-4" /> {user.hr.email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
-            {/* HR */}
-            {user.hr && (
+            {/* Manager OR HR themselves: Show only HR */}
+            {(user.role === "MANAGER" || user.role === "HR") && user.hr && (
               <div className="flex items-center gap-4">
                 <Avatar>
                   {user.hr.profileImage ? (
@@ -137,7 +169,7 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
                   )}
                 </Avatar>
                 <div>
-                  <p className="font-semibold">HR</p>
+                  <p className="font-semibold">{user.role === "HR" ? "ADMIN" : "HR"}</p>
                   <p>
                     {user.hr.firstName} {user.hr.lastName}
                   </p>
@@ -153,6 +185,7 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
           </CardContent>
         </Card>
       )}
+
 
       {/* Leave Balances */}
       <Card>
