@@ -7,7 +7,9 @@ import { Calendar, Briefcase, Mail, User as UserIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 
 export default function ProfilePage() {
-  const { data, isLoading, isError } = useGetProfileQuery();
+const { data, isLoading, isError } = useGetProfileQuery(undefined, {
+  refetchOnMountOrArgChange: true,
+});
 
   if (isLoading) {
     return <p className="p-6 text-center">Loading profile...</p>;
@@ -85,6 +87,72 @@ export default function ProfilePage() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Manager & HR Info */}
+      {(user.manager || user.hr) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reporting To</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Manager */}
+            {user.manager && (
+              <div className="flex items-center gap-4">
+                <Avatar>
+                  {user.manager.profileImage ? (
+                    <AvatarImage src={user.manager.profileImage} alt="Manager" />
+                  ) : (
+                    <AvatarFallback>
+                      {user.manager.firstName?.[0]}
+                      {user.manager.lastName?.[0]}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <div>
+                  <p className="font-semibold">Manager</p>
+                  <p>
+                    {user.manager.firstName} {user.manager.lastName}
+                  </p>
+                  <a
+                    href={`mailto:${user.manager.email}`}
+                    className="text-muted-foreground flex items-center gap-2 hover:underline"
+                  >
+                    <Mail className="h-4 w-4" /> {user.manager.email}
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* HR */}
+            {user.hr && (
+              <div className="flex items-center gap-4">
+                <Avatar>
+                  {user.hr.profileImage ? (
+                    <AvatarImage src={user.hr.profileImage} alt="HR" />
+                  ) : (
+                    <AvatarFallback>
+                      {user.hr.firstName?.[0]}
+                      {user.hr.lastName?.[0]}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <div>
+                  <p className="font-semibold">HR</p>
+                  <p>
+                    {user.hr.firstName} {user.hr.lastName}
+                  </p>
+                  <a
+                    href={`mailto:${user.hr.email}`}
+                    className="text-muted-foreground flex items-center gap-2 hover:underline"
+                  >
+                    <Mail className="h-4 w-4" /> {user.hr.email}
+                  </a>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Leave Balances */}
       <Card>
