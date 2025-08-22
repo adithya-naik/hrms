@@ -555,15 +555,27 @@ console.log("\n\n\User from token:\n\n\n", req.user);
       logger.error('Failed to update leave balance', error);
     }
   }
-async deleteLeavePolicy(req: AuthRequest, res: Response) {
-  const { id } = req.params;
+ async deleteLeavePolicy(req: AuthRequest, res: Response) {
+    const { id } = req.params;
 
-  await prisma.leavePolicy.delete({
-    where: { id },
-  });
+    try {
+      // Delete leave balances linked to this policy
+      await prisma.leaveBalance.deleteMany({
+        where: { leavePolicyId: id },
+      });
 
-  res.json({ success: true });
-}
+      // Then delete the policy
+      await prisma.leavePolicy.delete({
+        where: { id },
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      logger.error('Failed to delete leave policy:', error);
+      throw createError('Unable to delete leave policy. It may still be in use.', 400);
+    }
+  }
+
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
     const policy = await prisma.leavePolicy.findFirst({
