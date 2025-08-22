@@ -21,13 +21,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "My Leaves", href: "/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "Team Leaves", href: "/team-leaves", icon: Users, roles: ["MANAGER", "HR", "ADMIN"] },
   { name: "Leave Requests", href: "/leave-requests", icon: FileText, roles: ["MANAGER", "HR", "ADMIN"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
   { name: "Users", href: "/users", icon: Users, roles: ["HR", "ADMIN"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
+  { name: "My Profile", href: "/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
 ];
 
 export function Sidebar() {
@@ -48,7 +49,7 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile top bar */}
+      {/* Mobile Top Bar */}
       {isMobile && (
         <div className="flex items-center justify-between px-4 py-2 border-b bg-white fixed inset-x-0 top-0 z-50">
           <h2 className="text-lg font-semibold">Leave Portal</h2>
@@ -56,7 +57,7 @@ export function Sidebar() {
             variant="ghost"
             size="icon"
             onClick={() => setOpen(!open)}
-            aria-label={open ? "Close menu" : "Open menu"} // 🔹 Accessibility
+            aria-label={open ? "Close menu" : "Open menu"}
           >
             {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </Button>
@@ -74,7 +75,7 @@ export function Sidebar() {
               )
             : "hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-64"
         )}
-        aria-hidden={isMobile && !open} // 🔹 Accessibility
+        aria-hidden={isMobile && !open}
       >
         {/* Logo/Header */}
         {!isMobile && (
@@ -88,7 +89,7 @@ export function Sidebar() {
         <ScrollArea className="flex-1 px-2 overflow-y-auto">
           <nav className="space-y-1">
             {allowedNavigation.map((item) => {
-              const active = location.pathname.startsWith(item.href); // 🔹 Improved match
+              const active = location.pathname.startsWith(item.href);
               return (
                 <Button
                   key={item.name}
@@ -106,11 +107,14 @@ export function Sidebar() {
           </nav>
         </ScrollArea>
 
-        {/* User info + logout pinned bottom */}
+        {/* User info + Logout */}
         <div className="mt-auto p-4 border-t flex-shrink-0">
-          <div className="flex items-center gap-3 mb-4">
+          {/* 🔹 User Card → links to /me */}
+          <Link
+            to="/me"
+            className="flex items-center gap-3 mb-4 hover:bg-muted p-2 rounded-lg transition"
+          >
             <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center text-primary-foreground font-bold">
-              {/* 🔹 Show initials if available, else icon */}
               {user?.firstName ? (
                 <>
                   {user.firstName[0]}
@@ -128,7 +132,9 @@ export function Sidebar() {
                 {user?.role}
               </p>
             </div>
-          </div>
+          </Link>
+
+          {/* Logout Button */}
           <Button
             variant="ghost"
             className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -139,7 +145,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Mobile sidebar backdrop */}
+      {/* Mobile Sidebar Backdrop */}
       {isMobile && open && (
         <div
           className="fixed inset-0 z-30 bg-black/40"

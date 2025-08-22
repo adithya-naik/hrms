@@ -24,7 +24,7 @@ export default function Login() {
   }
 
   const location = useLocation() as unknown as { state: LocationState };
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || '/';
   const { login, isAuthenticated, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
