@@ -43,7 +43,7 @@ export default function Dashboard() {
         </div>
         {user?.role === 'EMPLOYEE' && (
           <Button asChild size="lg">
-            <Link to="/leaves/new">
+            <Link to="/app/leaves/new">
               <Plus className="mr-2 h-4 w-4" />
               Apply for Leave
             </Link>

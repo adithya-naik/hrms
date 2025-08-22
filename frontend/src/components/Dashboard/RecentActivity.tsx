@@ -1,17 +1,26 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, User, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
+import { useGetProfileQuery } from '@/store/api/authApi';
 
 interface RecentActivityProps {
   recentLeaves: any[];
   upcomingLeaves: any[];
-  userRole: string;
 }
 
-export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: RecentActivityProps) {
+export function RecentActivity({ recentLeaves, upcomingLeaves }: RecentActivityProps) {
+  const { data: profile, isLoading } = useGetProfileQuery();
+  const userRole = profile?.user.role;
+console.log(userRole)
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED':
@@ -28,11 +37,17 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
   };
 
   const formatLeaveType = (type: string) => {
-    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    return type
+      .replace('_', ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (l) => l.toUpperCase());
   };
+
+  if (isLoading) return <p>Loading recent activity...</p>;
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      {/* Recent Requests */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -41,21 +56,28 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
               Recent Requests
             </CardTitle>
             <CardDescription>
-              {userRole === 'EMPLOYEE' ? 'Your recent leave applications' : 'Recent leave requests'}
+              {userRole === 'EMPLOYEE'
+                ? 'Your recent leave applications'
+                : 'Recent leave requests'}
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/leaves">
-              <Eye className="h-4 w-4 mr-2" />
-              View All
-            </Link>
-          </Button>
+          {userRole !== 'ADMIN' && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/leaves">
+                <Eye className="h-4 w-4 mr-2" />
+                View All
+              </Link>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {recentLeaves?.length > 0 ? (
               recentLeaves.slice(0, 5).map((leave: any) => (
-                <div key={leave.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div
+                  key={leave.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex-1">
                     {userRole !== 'EMPLOYEE' && leave.requester && (
                       <div className="flex items-center gap-2 mb-1">
@@ -67,13 +89,16 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
                     )}
                     <p className="font-medium">{formatLeaveType(leave.leaveType)}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{format(new Date(leave.startDate), 'MMM dd')} - {format(new Date(leave.endDate), 'MMM dd')}</span>
-                      <span>{leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</span>
+                      <span>
+                        {format(new Date(leave.startDate), 'MMM dd')} -{' '}
+                        {format(new Date(leave.endDate), 'MMM dd')}
+                      </span>
+                      <span>
+                        {leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
-                  <Badge className={getStatusColor(leave.status)}>
-                    {leave.status}
-                  </Badge>
+                  <Badge className={getStatusColor(leave.status)}>{leave.status}</Badge>
                 </div>
               ))
             ) : (
@@ -86,6 +111,7 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
         </CardContent>
       </Card>
 
+      {/* Upcoming Leaves */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -94,21 +120,28 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
               Upcoming Leaves
             </CardTitle>
             <CardDescription>
-              {userRole === 'EMPLOYEE' ? 'Your approved upcoming leaves' : 'Team upcoming leaves'}
+              {userRole === 'EMPLOYEE'
+                ? 'Your approved upcoming leaves'
+                : 'Team upcoming leaves'}
             </CardDescription>
           </div>
-          <Button variant="outline" size="sm" asChild>
-  <Link to="/leaves?status=APPROVED&page=1&limit=10">
-    <Eye className="h-4 w-4 mr-2" />
-    View All
-  </Link>
-</Button>
+          {userRole !== 'ADMIN' && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/leaves?status=APPROVED&page=1&limit=10">
+                <Eye className="h-4 w-4 mr-2" />
+                View All
+              </Link>
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {upcomingLeaves?.length > 0 ? (
               upcomingLeaves.slice(0, 5).map((leave: any) => (
-                <div key={leave.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div
+                  key={leave.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex-1">
                     {userRole !== 'EMPLOYEE' && leave.requester && (
                       <div className="flex items-center gap-2 mb-1">
@@ -120,14 +153,23 @@ export function RecentActivity({ recentLeaves, upcomingLeaves, userRole }: Recen
                     )}
                     <p className="font-medium">{formatLeaveType(leave.leaveType)}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>{format(new Date(leave.startDate), 'MMM dd')} - {format(new Date(leave.endDate), 'MMM dd')}</span>
-                      <span>{leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}</span>
+                      <span>
+                        {format(new Date(leave.startDate), 'MMM dd')} -{' '}
+                        {format(new Date(leave.endDate), 'MMM dd')}
+                      </span>
+                      <span>
+                        {leave.totalDays} day{leave.totalDays !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium text-green-600">Approved</div>
                     <div className="text-xs text-muted-foreground">
-                      {Math.ceil((new Date(leave.startDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left
+                      {Math.ceil(
+                        (new Date(leave.startDate).getTime() - new Date().getTime()) /
+                          (1000 * 60 * 60 * 24)
+                      )}{' '}
+                      days left
                     </div>
                   </div>
                 </div>

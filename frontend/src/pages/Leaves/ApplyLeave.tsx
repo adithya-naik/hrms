@@ -78,7 +78,7 @@ export default function ApplyLeave() {
       }).unwrap();
 
       toast.success('Leave request submitted successfully!');
-      navigate('/leaves');
+      navigate('/app/leaves');
     } catch (error: any) {
       toast.error(error?.data?.error || 'Failed to submit leave request');
     } finally {
@@ -108,7 +108,7 @@ export default function ApplyLeave() {
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="outline" size="sm" asChild>
-          <Link to="/leaves">
+          <Link to="/app/leaves">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Leaves
           </Link>
@@ -361,7 +361,7 @@ export default function ApplyLeave() {
                   {isSubmitting ? 'Submitting...' : 'Submit Leave Request'}
                 </Button>
                 <Button type="button" variant="outline" asChild>
-                  <Link to="/leaves">Cancel</Link>
+                  <Link to="/app/leaves">Cancel</Link>
                 </Button>
               </div>
             </form>
