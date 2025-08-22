@@ -207,9 +207,6 @@ export default function Settings() {
                                 <SelectContent>
                                   <SelectItem value="SICK">Sick Leave</SelectItem>
                                   <SelectItem value="CASUAL">Casual Leave</SelectItem>
-                                  <SelectItem value="VACATION">Vacation</SelectItem>
-                                  <SelectItem value="ACADEMIC">Academic Leave</SelectItem>
-                                  <SelectItem value="COMP_OFF">Comp Off</SelectItem>
                                   <SelectItem value="WFH">Work From Home</SelectItem>
                                 </SelectContent>
                               </Select>

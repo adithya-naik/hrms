@@ -6,20 +6,54 @@ import { AuthRequest } from '../middleware/auth';
 import { LeaveType, LeaveStatus, UserRole } from '@prisma/client';
 import { sendEmail, emailTemplates } from '../lib/email';
 import { logger } from '../utils/logger';
+import multer from 'multer';
+import path from 'path';
 
 const createLeaveSchema = z.object({
   leaveType: z.nativeEnum(LeaveType),
   startDate: z.string().transform((str) => new Date(str)),
   endDate: z.string().transform((str) => new Date(str)),
   reason: z.string().min(1),
-  isHalfDay: z.boolean().default(false),
-  emergencyLeave: z.boolean().default(false),
-  attachments: z.array(z.string()).default([]),
+
+  // Convert string "true"/"false" from form-data to boolean
+  isHalfDay: z.union([z.string(), z.boolean()]).transform((val) => val === 'true' || val === true),
+  emergencyLeave: z.union([z.string(), z.boolean()]).transform((val) => val === 'true' || val === true),
+
+  //attachments: z.array(z.string()).optional().default([]),
+}).refine((data) => data.endDate >= data.startDate, {
+  message: "End date must be after start date",
+  path: ["endDate"],
 });
+
 
 const approveRejectSchema = z.object({
   rejectionReason: z.string().optional(),
 });
+
+// Uploads will go to 'uploads/' folder with original filename
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/'); // make sure this folder exists
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
+  },
+});
+
+// Only allow specific file types
+const fileFilter = (req: any, file: any, cb: any) => {
+  const allowedTypes = /pdf|doc|docx|jpg|jpeg|png/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error('File type not allowed'));
+  }
+};
+
+export const upload = multer({ storage, fileFilter });
 
 class LeaveController {
   constructor() {
@@ -78,64 +112,73 @@ class LeaveController {
   }
 
   async createLeave(req: AuthRequest, res: Response) {
-    const data = createLeaveSchema.parse(req.body);
-    const userId = req.user!.id;
+  // Extract attachments uploaded via multer
+  const files = req.files as Express.Multer.File[] | undefined;
 
-    // Validate leave request
-    await this.validateLeaveRequest(userId, data);
+  // Convert file paths to URLs accessible from frontend
+  const attachments = files?.map(file => `/uploads/${file.filename}`) || [];
 
-    // Calculate total days
-    const totalDays = this.calculateLeaveDays(data.startDate, data.endDate, data.isHalfDay);
+  // Parse the rest of the body
+  const data = createLeaveSchema.parse(req.body);
 
-    const leave = await prisma.leave.create({
-      data: {
-        ...data,
-        requesterId: userId,
-        totalDays,
-      },
-      include: {
-        requester: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-            manager: {
-              select: {
-                email: true,
-                firstName: true,
-                lastName: true,
-              },
+  const userId = req.user!.id;
+
+  // Validate leave request
+  await this.validateLeaveRequest(userId, data);
+
+  // Calculate total days
+  const totalDays = this.calculateLeaveDays(data.startDate, data.endDate, data.isHalfDay);
+
+  const leave = await prisma.leave.create({
+    data: {
+      ...data,
+      requesterId: userId,
+      totalDays,
+      attachments, // Save URLs
+    },
+    include: {
+      requester: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          manager: {
+            select: {
+              email: true,
+              firstName: true,
+              lastName: true,
             },
           },
         },
       },
-    });
+    },
+  });
 
-    // Update pending days in leave balance with leave start year
-    await this.updateLeaveBalance(userId, data.leaveType, totalDays, 'pending', data.startDate.getFullYear());
+  // Update pending days in leave balance with leave start year
+  await this.updateLeaveBalance(userId, data.leaveType, totalDays, 'pending', data.startDate.getFullYear());
 
-    // Send notification to manager
-    if (leave.requester.manager) {
-      try {
-        const template = emailTemplates.leaveRequest(
-          `${leave.requester.firstName} ${leave.requester.lastName}`,
-          data.leaveType,
-          data.startDate.toDateString(),
-          data.endDate.toDateString()
-        );
+  // Send notification to manager
+  if (leave.requester.manager) {
+    try {
+      const template = emailTemplates.leaveRequest(
+        `${leave.requester.firstName} ${leave.requester.lastName}`,
+        data.leaveType,
+        data.startDate.toDateString(),
+        data.endDate.toDateString()
+      );
 
-        await sendEmail({
-          to: leave.requester.manager.email,
-          subject: template.subject,
-          html: template.html,
-        });
-      } catch (error) {
-        logger.error('Failed to send leave request notification:', error);
-      }
+      await sendEmail({
+        to: leave.requester.manager.email,
+        subject: template.subject,
+        html: template.html,
+      });
+    } catch (error) {
+      logger.error('Failed to send leave request notification:', error);
     }
-
-    res.status(201).json({ leave });
   }
+
+  res.status(201).json({ leave });
+}
 
   async getLeaveBalances(req: AuthRequest, res: Response) {
     const year = parseInt(req.query.year as string) || new Date().getFullYear();
@@ -296,42 +339,46 @@ console.log("\n\n\User from token:\n\n\n", req.user);
   }
 
   async cancelLeave(req: AuthRequest, res: Response) {
-    const { id } = req.params;
-    const userId = req.user!.id;
+  const { id } = req.params;
+  const user = req.user!;
 
-    const leave = await prisma.leave.findUnique({
-      where: { id },
-    });
+  // Fetch the leave
+  const leave = await prisma.leave.findUnique({
+    where: { id },
+  });
 
-    if (!leave) {
-      throw createError('Leave request not found', 404);
-    }
-
-    if (leave.requesterId !== userId) {
-      throw createError('You can only cancel your own leave requests', 403);
-    }
-
-    if (leave.status !== LeaveStatus.PENDING && leave.status !== LeaveStatus.APPROVED) {
-      throw createError('Cannot cancel this leave request', 400);
-    }
-
-    const updatedLeave = await prisma.leave.update({
-      where: { id },
-      data: { status: LeaveStatus.CANCELLED },
-    });
-
-    // Restore balance based on current status with leave start year
-    const balanceAction = leave.status === LeaveStatus.PENDING ? 'reject' : 'cancel';
-    await this.updateLeaveBalance(
-      leave.requesterId,
-      leave.leaveType,
-      leave.totalDays,
-      balanceAction,
-      leave.startDate.getFullYear()
-    );
-
-    res.json({ leave: updatedLeave });
+  if (!leave) {
+    throw createError('Leave request not found', 404);
   }
+
+  // Only the requester can cancel their own leave
+  if (leave.requesterId !== user.id) {
+    throw createError('You can only cancel your own leave requests', 403);
+  }
+
+  // Only pending or approved leaves can be cancelled
+  if (leave.status !== LeaveStatus.PENDING && leave.status !== LeaveStatus.APPROVED) {
+    throw createError('Cannot cancel this leave request', 400);
+  }
+
+  // Update leave status to CANCELLED
+  const updatedLeave = await prisma.leave.update({
+    where: { id },
+    data: { status: LeaveStatus.CANCELLED },
+  });
+
+  // Restore leave balance if needed
+  const balanceAction = leave.status === LeaveStatus.PENDING ? 'reject' : 'cancel';
+  await this.updateLeaveBalance(
+    leave.requesterId,
+    leave.leaveType,
+    leave.totalDays,
+    balanceAction,
+    leave.startDate.getFullYear()
+  );
+
+  res.json({ leave: updatedLeave });
+}
 
   async getTeamLeaves(req: AuthRequest, res: Response) {
     const { status, page = '1', limit = '10' } = req.query;

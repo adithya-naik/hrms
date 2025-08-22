@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Search, Filter, Eye, X, Calendar, Clock, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -19,12 +19,11 @@ export default function MyLeaves() {
   const [search, setSearch] = useState('');
   const [selectedLeave, setSelectedLeave] = useState<any>(null);
 
-
-const { data: leavesData, isLoading } = useGetLeavesQuery({
-  page,
-  limit: 10,
-  status: status === "ALL" ? undefined : status, 
-});
+  const { data: leavesData, isLoading } = useGetLeavesQuery({
+    page,
+    limit: 10,
+    status: status === "ALL" ? undefined : status, 
+  });
 
   const [cancelLeave] = useCancelLeaveMutation();
 
@@ -101,18 +100,18 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
               />
             </div>
             <Select value={status} onValueChange={setStatus}>
-  <SelectTrigger className="w-full sm:w-[180px]">
-    <Filter className="mr-2 h-4 w-4" />
-    <SelectValue placeholder="Filter by status" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="ALL">All Status</SelectItem>
-    <SelectItem value="PENDING">Pending</SelectItem>
-    <SelectItem value="APPROVED">Approved</SelectItem>
-    <SelectItem value="REJECTED">Rejected</SelectItem>
-    <SelectItem value="CANCELLED">Cancelled</SelectItem>
-  </SelectContent>
-</Select>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All Status</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Desktop Table */}
@@ -159,9 +158,6 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle>Leave Request Details</DialogTitle>
-                              <DialogDescription>
-                                View complete information about this leave request
-                              </DialogDescription>
                             </DialogHeader>
                             {selectedLeave && (
                               <div className="space-y-4">
@@ -195,16 +191,39 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                                     <p className="text-sm text-muted-foreground">{format(new Date(selectedLeave.appliedDate), 'MMMM dd, yyyy')}</p>
                                   </div>
                                 </div>
+
                                 <div>
                                   <label className="text-sm font-medium">Reason</label>
                                   <p className="text-sm text-muted-foreground mt-1">{selectedLeave.reason}</p>
                                 </div>
+
+                                {/* Attachments */}
+                                {selectedLeave.attachments && selectedLeave.attachments.length > 0 && (
+                                  <div>
+                                    <label className="text-sm font-medium">Attachments</label>
+                                    <ul className="mt-1 space-y-1">
+                                      {selectedLeave.attachments.map((file: string, idx: number) => (
+                                        <li key={idx}>
+                                             <a href={`http://localhost:5000/${file.replace(/\\/g, '/')}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="text-blue-600 underline flex items-center gap-1"
+>
+  <FileText className="h-4 w-4" /> {file.split(/[/\\]/).pop()}
+</a>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+
                                 {selectedLeave.rejectionReason && (
                                   <div>
                                     <label className="text-sm font-medium text-red-600">Rejection Reason</label>
                                     <p className="text-sm text-red-600 mt-1">{selectedLeave.rejectionReason}</p>
                                   </div>
                                 )}
+
                                 {selectedLeave.approver && (
                                   <div>
                                     <label className="text-sm font-medium">Approved By</label>
@@ -229,16 +248,16 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Cancel Leave Request</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to cancel this leave request? This action cannot be undone.
+                                  Are you sure you want to cancel this leave request?
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>No, Keep It</AlertDialogCancel>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleCancelLeave(leave.id)}
                                   className="bg-red-600 hover:bg-red-700"
                                 >
-                                  Yes, Cancel Leave
+                                  Confirm
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -268,7 +287,7 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                       {leave.status}
                     </Badge>
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
@@ -280,7 +299,7 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                         {format(new Date(leave.appliedDate), 'MMM dd')}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <Dialog>
                         <DialogTrigger asChild>
@@ -313,6 +332,26 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
                                   <label className="text-sm font-medium">Reason</label>
                                   <p className="text-sm text-muted-foreground">{selectedLeave.reason}</p>
                                 </div>
+                                {/* Attachments */}
+                                {selectedLeave.attachments && selectedLeave.attachments.length > 0 && (
+                                  <div>
+                                    <label className="text-sm font-medium">Attachments</label>
+                                    <ul className="mt-1 space-y-1">
+                                      {selectedLeave.attachments.map((file: string, idx: number) => (
+                                        <li key={idx}>
+                                          <a
+                                            href={`http://localhost:5000${file}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 underline"
+                                          >
+                                            {file.split('/').pop()}
+                                          </a>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}

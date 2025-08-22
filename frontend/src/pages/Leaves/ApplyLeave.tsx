@@ -68,23 +68,35 @@ export default function ApplyLeave() {
   };
 
   const onSubmit = async (data: LeaveFormData) => {
-    setIsSubmitting(true);
-    try {
-      await createLeave({
-        ...data,
-        startDate: data.startDate.toISOString(),
-        endDate: data.endDate.toISOString(),
-        attachments: uploadedFiles,
-      }).unwrap();
+  setIsSubmitting(true);
+  try {
+    // Create FormData to handle files
+    const formData = new FormData();
+    formData.append('leaveType', data.leaveType);
+    formData.append('startDate', data.startDate.toISOString());
+    formData.append('endDate', data.endDate.toISOString());
+    formData.append('reason', data.reason);
+    formData.append('isHalfDay', String(data.isHalfDay));
+    formData.append('emergencyLeave', String(data.emergencyLeave));
 
-      toast.success('Leave request submitted successfully!');
-      navigate('/app/leaves');
-    } catch (error: any) {
-      toast.error(error?.data?.error || 'Failed to submit leave request');
-    } finally {
-      setIsSubmitting(false);
+    // Append selected files
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput?.files) {
+      Array.from(fileInput.files).forEach(file => formData.append('attachments', file));
     }
-  };
+
+    // Send FormData to backend
+    await createLeave(formData).unwrap();
+
+    toast.success('Leave request submitted successfully!');
+    navigate('/app/leaves');
+  } catch (error: any) {
+    toast.error(error?.data?.error || 'Failed to submit leave request');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
