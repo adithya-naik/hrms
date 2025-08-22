@@ -14,25 +14,27 @@ import {
   X,
   FileText,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
-  { name: "My Leaves", href: "/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
-  { name: "Team Leaves", href: "/team-leaves", icon: Users, roles: ["MANAGER", "HR", "ADMIN"] },
-  { name: "Leave Requests", href: "/leave-requests", icon: FileText, roles: ["MANAGER", "HR", "ADMIN"] },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
-  { name: "Users", href: "/users", icon: Users, roles: ["HR", "ADMIN"] },
-  { name: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
-  { name: "My Profile", href: "/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "Dashboard", href: "/app", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "My Leaves", href: "/app/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR"] },
+  { name: "Team Leaves", href: "/app/team-leaves", icon: Users, roles: ["MANAGER", "HR","ADMIN"] },
+  { name: "Leave Requests", href: "/app/leave-requests", icon: FileText, roles: ["MANAGER", "HR"] },
+  { name: "Reports", href: "/app/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
+  { name: "Users", href: "/app/users", icon: Users, roles: ["HR", "ADMIN"] },
+  { name: "Settings", href: "/app/settings", icon: Settings, roles: ["ADMIN"] },
+  { name: "My Profile", href: "/app/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
 ];
+
 
 export function Sidebar() {
   const location = useLocation();
+  const navigate = useNavigate(); // ✅ for redirect
   const { user } = useSelector((state: RootState) => state.auth);
   const { logout } = useAuth();
   const isMobile = useIsMobile();
@@ -111,7 +113,7 @@ export function Sidebar() {
         <div className="mt-auto p-4 border-t flex-shrink-0">
           {/* 🔹 User Card → links to /me */}
           <Link
-            to="/me"
+            to="/app/me"
             className="flex items-center gap-3 mb-4 hover:bg-muted p-2 rounded-lg transition"
           >
             <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center text-primary-foreground font-bold">
@@ -138,7 +140,10 @@ export function Sidebar() {
           <Button
             variant="ghost"
             className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={logout}
+            onClick={() => {
+              logout();       // clear auth state
+              navigate("/");  // ✅ redirect after logout
+            }}
           >
             <LogOut className="mr-2 h-5 w-5" /> Sign Out
           </Button>

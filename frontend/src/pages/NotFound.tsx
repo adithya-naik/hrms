@@ -6,7 +6,7 @@ export default function NotFoundPage() {
   const [redirect, setRedirect] = useState(false);
 
   if (redirect) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return (
