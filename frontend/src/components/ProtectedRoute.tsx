@@ -12,15 +12,23 @@ interface Props {
 
 export const ProtectedRoute: React.FC<Props> = ({ children, roles }) => {
   const location = useLocation();
-  const { isAuthenticated, user } = useSelector((s: RootState) => s.auth);
+  const { isAuthenticated, user, loading } = useSelector((s: RootState) => s.auth);
 
+  // ⏳ Optional: prevent flicker while checking auth
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
+
+  // 🚫 Not logged in → go to login
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (roles && user && !roles.includes(user.role)) {
+  // 🔑 Check role permissions
+  if (roles && (!user || !roles.includes(user.role as Role))) {
     return <Navigate to="/unauthorized" replace />;
   }
 
+  // ✅ Authorized → render children
   return <>{children}</>;
 };
