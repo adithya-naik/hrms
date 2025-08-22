@@ -76,7 +76,7 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
           <p className="text-muted-foreground">Manage your leave requests and view history</p>
         </div>
         <Button asChild size="lg">
-          <Link to="/leaves/new">
+          <Link to="/app/leaves/new">
             <Plus className="mr-2 h-4 w-4" />
             Apply for Leave
           </Link>
@@ -384,7 +384,7 @@ const { data: leavesData, isLoading } = useGetLeavesQuery({
               <h3 className="text-lg font-medium mb-2">No leave requests found</h3>
               <p className="text-muted-foreground mb-4">You haven't submitted any leave requests yet.</p>
               <Button asChild>
-                <Link to="/leaves/new">
+                <Link to="/app/leaves/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Apply for Leave
                 </Link>
