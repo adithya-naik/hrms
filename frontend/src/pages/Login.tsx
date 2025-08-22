@@ -19,25 +19,26 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const location = useLocation() as any;
-  const from = location.state?.from?.pathname || '/';
+  interface LocationState {
+    from?: { pathname: string };
+  }
+
+  const location = useLocation() as unknown as { state: LocationState };
+  const from = location.state?.from?.pathname || '/dashboard';
   const { login, isAuthenticated, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: '',
-      password: '',
-    },
+    defaultValues: { username: '', password: '' },
   });
 
   const onSubmit = async (data: LoginFormData) => {
     setError('');
     const result = await login(data.username, data.password);
     if (!result.success) {
-      setError(result.error || 'Login failed');
+      setError(result.error ?? 'Invalid username or password');
     }
   };
 
@@ -73,7 +74,12 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Username or Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="johndoe or john@company.com" {...field} disabled={isLoading} />
+                      <Input
+                        autoFocus
+                        placeholder="johndoe or john@company.com"
+                        {...field}
+                        disabled={isLoading}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -98,6 +104,7 @@ export default function Login() {
                           type="button"
                           variant="ghost"
                           size="sm"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
                           className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowPassword(!showPassword)}
                           disabled={isLoading}
@@ -114,6 +121,13 @@ export default function Login() {
               <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
                 {isLoading ? 'Signing in...' : 'Sign In'}
               </Button>
+
+              {/* Forgot Password Link */}
+              <div className="text-right">
+                <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                  Forgot Password?
+                </Link>
+              </div>
             </form>
           </Form>
 

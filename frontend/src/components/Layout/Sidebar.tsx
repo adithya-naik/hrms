@@ -21,11 +21,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const navigation = [
-  { name: "Dashboard", href: "/", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "My Leaves", href: "/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "Team Leaves", href: "/team-leaves", icon: Users, roles: ["MANAGER", "HR", "ADMIN"] },
-  {name: 'Leave Requests',href: '/leave-requests',icon: FileText,roles: ['MANAGER', 'HR', 'ADMIN'],
-  },
+  { name: "Leave Requests", href: "/leave-requests", icon: FileText, roles: ["MANAGER", "HR", "ADMIN"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
   { name: "Users", href: "/users", icon: Users, roles: ["HR", "ADMIN"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["ADMIN"] },
@@ -42,13 +41,23 @@ export function Sidebar() {
     (item) => user && item.roles.includes(user.role)
   );
 
+  // 🔹 Close mobile sidebar on route change
+  React.useEffect(() => {
+    if (isMobile) setOpen(false);
+  }, [location.pathname, isMobile]);
+
   return (
     <>
       {/* Mobile top bar */}
       {isMobile && (
         <div className="flex items-center justify-between px-4 py-2 border-b bg-white fixed inset-x-0 top-0 z-50">
           <h2 className="text-lg font-semibold">Leave Portal</h2>
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpen(!open)}
+            aria-label={open ? "Close menu" : "Open menu"} // 🔹 Accessibility
+          >
             {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </Button>
         </div>
@@ -57,7 +66,7 @@ export function Sidebar() {
       {/* Sidebar */}
       <div
         className={cn(
-          "bg-white border-r pt-12 md:pt-4 transition-transform duration-300 z-40 shadow-md flex flex-col h-screen", // flex-col + h-screen ensures full height
+          "bg-white border-r pt-12 md:pt-4 transition-transform duration-300 z-40 shadow-md flex flex-col h-screen",
           isMobile
             ? cn(
                 "fixed top-0 left-0 h-full w-64 overflow-auto",
@@ -65,6 +74,7 @@ export function Sidebar() {
               )
             : "hidden md:flex md:fixed md:inset-y-0 md:left-0 md:w-64"
         )}
+        aria-hidden={isMobile && !open} // 🔹 Accessibility
       >
         {/* Logo/Header */}
         {!isMobile && (
@@ -78,14 +88,13 @@ export function Sidebar() {
         <ScrollArea className="flex-1 px-2 overflow-y-auto">
           <nav className="space-y-1">
             {allowedNavigation.map((item) => {
-              const active = location.pathname === item.href;
+              const active = location.pathname.startsWith(item.href); // 🔹 Improved match
               return (
                 <Button
                   key={item.name}
                   variant={active ? "secondary" : "ghost"}
                   className="w-full justify-start"
                   asChild
-                  onClick={() => isMobile && setOpen(false)}
                 >
                   <Link to={item.href} className="flex items-center">
                     <item.icon className="mr-3 h-5 w-5" />
@@ -100,8 +109,16 @@ export function Sidebar() {
         {/* User info + logout pinned bottom */}
         <div className="mt-auto p-4 border-t flex-shrink-0">
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center">
-              <User className="w-5 h-5 text-primary-foreground" />
+            <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center text-primary-foreground font-bold">
+              {/* 🔹 Show initials if available, else icon */}
+              {user?.firstName ? (
+                <>
+                  {user.firstName[0]}
+                  {user?.lastName?.[0]}
+                </>
+              ) : (
+                <User className="w-5 h-5" />
+              )}
             </div>
             <div className="min-w-0">
               <p className="font-semibold truncate">

@@ -37,16 +37,16 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* ---------- Protected Routes (App) ---------- */}
+            {/* ---------- Protected Routes (Main App) ---------- */}
             <Route
-              path="/app"
+              path="/"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Dashboard />} />
+              <Route path="dashboard" element={<Dashboard />} />
               <Route path="leaves" element={<MyLeaves />} />
               <Route path="leaves/new" element={<ApplyLeave />} />
 
