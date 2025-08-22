@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import { store } from '@/store';
 import { Layout } from '@/components/Layout/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+
 import Dashboard from '@/pages/Dashboard';
 import MyLeaves from '@/pages/Leaves/MyLeaves';
 import ApplyLeave from '@/pages/Leaves/ApplyLeave';
@@ -17,8 +18,10 @@ import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Unauthorized from '@/pages/Unauthorized';
 import NotFound from '@/pages/NotFound';
-import React from 'react';
 import ProfilePage from './pages/ProfilePage';
+import Landing from '@/pages/Landing'; // ✅ new landing page
+
+import React from 'react';
 
 const queryClient = new QueryClient();
 
@@ -30,22 +33,44 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             {/* Public Routes */}
+            <Route path="/" element={<Landing />} /> {/* ✅ Landing page */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected Routes */}
+            {/* Protected App Routes */}
             <Route
-              path="/"
+              path="/app"
               element={
                 <ProtectedRoute>
                   <Layout />
                 </ProtectedRoute>
               }
             >
+              {/* Dashboard → All roles */}
               <Route index element={<Dashboard />} />
-              <Route path="leaves" element={<MyLeaves />} />
-              <Route path="leaves/new" element={<ApplyLeave />} />
+
+              {/* My Leaves → EMPLOYEE, MANAGER, HR */}
+              <Route
+                path="leaves"
+                element={
+                  <ProtectedRoute roles={['EMPLOYEE', 'MANAGER', 'HR']}>
+                    <MyLeaves />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Apply Leave */}
+              <Route
+                path="leaves/new"
+                element={
+                  <ProtectedRoute roles={['EMPLOYEE', 'MANAGER', 'HR']}>
+                    <ApplyLeave />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Team Leaves */}
               <Route
                 path="team-leaves"
                 element={
@@ -54,14 +79,18 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+
+              {/* Leave Requests */}
               <Route
                 path="leave-requests"
                 element={
-                  <ProtectedRoute roles={['MANAGER', 'HR', 'ADMIN']}>
+                  <ProtectedRoute roles={['MANAGER', 'HR']}>
                     <TeamLeaves />
                   </ProtectedRoute>
                 }
               />
+
+              {/* Reports */}
               <Route
                 path="reports"
                 element={
@@ -70,6 +99,8 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+
+              {/* Users */}
               <Route
                 path="users"
                 element={
@@ -78,6 +109,8 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
+
+              {/* Settings */}
               <Route
                 path="settings"
                 element={
@@ -86,7 +119,9 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route path="me" element={<ProfilePage />} />
+
+              {/* My Profile */}
+              <Route path="/app/me" element={<ProfilePage />} />
             </Route>
 
             {/* Catch-all */}
