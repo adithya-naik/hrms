@@ -77,14 +77,15 @@ export const leaveApi = createApi({
       providesTags: ["Leave"],
     }),
 
-    createLeave: builder.mutation<any, any>({
-      query: (leaveData) => ({
-        url: "",
-        method: "POST",
-        body: leaveData,
-      }),
-      invalidatesTags: ["Leave", "LeaveBalance"],
-    }),
+    createLeave: builder.mutation<any, FormData>({
+  query: (formData) => ({
+    url: "",
+    method: "POST",
+    body: formData, // FormData will include files and other fields
+    // IMPORTANT: Do NOT set headers manually — fetchBaseQuery will set multipart/form-data automatically
+  }),
+  invalidatesTags: ["Leave", "LeaveBalance"],
+}),
 
     getLeaveBalances: builder.query<any, number>({
       query: (year) => ({
