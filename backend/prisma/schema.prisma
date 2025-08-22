@@ -7,6 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//
+// Enums
+//
 enum UserRole {
   EMPLOYEE
   MANAGER
@@ -39,20 +42,24 @@ enum AuditAction {
   CANCEL
 }
 
+//
+// Models
+//
 model User {
   id              String    @id @default(cuid())
-  username        String    @unique            
-  auth0Id         String?   @unique           
+  username        String    @unique
+  auth0Id         String?   @unique
   email           String    @unique
-  password        String                        
+  password        String
   firstName       String
   lastName        String
   employeeId      String    @unique
   role            UserRole  @default(EMPLOYEE)
   managerId       String?
+  hrId            String?   // 👈 NEW: Each employee can be linked to a dedicated HR
   departmentId    String?
   isActive        Boolean   @default(true)
-  joinDate        DateTime  @default(now())    
+  joinDate        DateTime  @default(now())
   profileImage    String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -60,6 +67,10 @@ model User {
   // Relations
   manager         User?        @relation("ManagerEmployee", fields: [managerId], references: [id])
   employees       User[]       @relation("ManagerEmployee")
+
+  hr              User?        @relation("HREmployee", fields: [hrId], references: [id])
+  hrEmployees     User[]       @relation("HREmployee")
+
   department      Department?  @relation(fields: [departmentId], references: [id])
   leaveRequests   Leave[]      @relation("LeaveRequester")
   approvedLeaves  Leave[]      @relation("LeaveApprover")
@@ -87,7 +98,7 @@ model Department {
 
 model LeavePolicy {
   id                    String    @id @default(cuid())
-  leaveType             LeaveType @unique   // 👈 added
+  leaveType             LeaveType @unique
   annualQuota           Int
   maxConsecutiveDays    Int?
   minDaysNotice         Int       @default(1)
@@ -154,7 +165,7 @@ model LeaveBalance {
 
 model Holiday {
   id          String   @id @default(cuid())
-  name        String   @unique   // 👈 added
+  name        String   @unique
   date        DateTime
   description String?
   isRecurring Boolean  @default(false)
@@ -164,13 +175,14 @@ model Holiday {
 
   @@map("holidays")
 }
+
 model Setting {
   id           String   @id @default(cuid())
   companyName  String
-  logoUrl      String?   // optional
-  address      String?   // optional
-  contactEmail String?   // optional
-  contactPhone String?   // optional
+  logoUrl      String?
+  address      String?
+  contactEmail String?
+  contactPhone String?
   timezone     String
   currency     String
   dateFormat   String
@@ -178,7 +190,10 @@ model Setting {
   language     String
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  @@map("settings")
 }
+
 model Notification {
   id        String   @id @default(cuid())
   userId    String

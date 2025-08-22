@@ -74,7 +74,7 @@ const App = () => (
               <Route
                 path="team-leaves"
                 element={
-                  <ProtectedRoute roles={['MANAGER', 'HR', 'ADMIN']}>
+                  <ProtectedRoute roles={['MANAGER']}>
                     <TeamLeaves />
                   </ProtectedRoute>
                 }
@@ -84,7 +84,7 @@ const App = () => (
               <Route
                 path="leave-requests"
                 element={
-                  <ProtectedRoute roles={['MANAGER', 'HR']}>
+                  <ProtectedRoute roles={['MANAGER', 'HR',"ADMIN"]}>
                     <TeamLeaves />
                   </ProtectedRoute>
                 }
