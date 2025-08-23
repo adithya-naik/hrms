@@ -1,3 +1,4 @@
+import React from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -6,7 +7,6 @@ import { Provider } from 'react-redux';
 import { store } from '@/store';
 import { Layout } from '@/components/Layout/Layout';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-
 import Dashboard from '@/pages/Dashboard';
 import MyLeaves from '@/pages/Leaves/MyLeaves';
 import ApplyLeave from '@/pages/Leaves/ApplyLeave';
@@ -20,17 +20,21 @@ import Unauthorized from '@/pages/Unauthorized';
 import NotFound from '@/pages/NotFound';
 import ProfilePage from './pages/ProfilePage';
 import Landing from '@/pages/Landing'; // ✅ new landing page
-
-import React from 'react';
+import { useNotificationsSSE } from "@/hooks/useNotificationsSSE";
+import NotificationsPage from './pages/NotificationsPage';
 
 const queryClient = new QueryClient();
-
+const NotificationsSSEInitializer = () => {
+  useNotificationsSSE();
+  return null; // doesn’t render anything
+};
 const App = () => (
   <Provider store={store}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <BrowserRouter>
+          <NotificationsSSEInitializer />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Landing />} /> {/* ✅ Landing page */}
@@ -84,12 +88,12 @@ const App = () => (
               <Route
                 path="leave-requests"
                 element={
-                  <ProtectedRoute roles={['MANAGER', 'HR',"ADMIN"]}>
+                  <ProtectedRoute roles={['MANAGER', 'HR', "ADMIN"]}>
                     <TeamLeaves />
                   </ProtectedRoute>
                 }
               />
-
+              {/* notifications */} <Route path="notifications" element={<ProtectedRoute roles={['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']}> <NotificationsPage /> </ProtectedRoute>} />
               {/* Reports */}
               <Route
                 path="reports"
