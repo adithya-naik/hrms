@@ -18,6 +18,14 @@ router.put(
   leaveController.cancelLeave
 );
 
+// PATCH /:id/day-status with proper authorization
+router.patch(
+  '/:id/day-status',
+  authorize([UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
+  leaveController.updateDayStatuses
+);
+
+
 // Manager/HR routes
 router.put(
   '/:id/approve',

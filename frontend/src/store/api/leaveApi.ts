@@ -5,7 +5,7 @@ import { RootState } from "../index";
 // ---------------- Types ----------------
 export interface DayStatus {
   date: string; // 'YYYY-MM-DD'
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PARTIAL';
   rejectedReason?: string;
 }
 
