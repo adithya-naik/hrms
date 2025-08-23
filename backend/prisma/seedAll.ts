@@ -1,11 +1,34 @@
-import { PrismaClient, LeaveType } from "@prisma/client"; // 👈 import LeaveType enum
+import { PrismaClient, LeaveType } from "@prisma/client"; // 👈 import enums
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Starting seeding...");
 
-  // Step 1: Create Leave Policies (use enums, not strings)
+  // ---------------- STEP 1: Seed Settings ----------------
+  const settingData = {
+    id: "cmeo1lc610000okxdq7kd161g", // keep fixed for idempotent seeding
+    companyName: "TensorGo",
+    logoUrl: "https://tensorgo.com/wp-content/uploads/2024/09/191x40.webp",
+    address: "403, 4th Floor, B-Block, The Platina, Main Road Kondapur, Gachibowli, Hyderabad, Telangana, 500032.  info@tensorgo.com",
+    contactEmail: "info@tensorgo.com",
+    contactPhone: "9121170501",
+    timezone: "Asia/Kolkata",
+    currency: "INR",
+    dateFormat: "DD/MM/YYYY",
+    timeFormat: "24h",
+    language: "en",
+  };
+
+  await prisma.setting.upsert({
+    where: { id: settingData.id },
+    update: settingData,
+    create: settingData,
+  });
+
+  console.log("✅ Settings seeded");
+
+  // ---------------- STEP 2: Leave Policies ----------------
   const policiesData = [
     { leaveType: LeaveType.SICK, annualQuota: 12, maxConsecutiveDays: 5, minDaysNotice: 0, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
     { leaveType: LeaveType.CASUAL, annualQuota: 15, maxConsecutiveDays: 3, minDaysNotice: 1, requiresApproval: true, requiresDocument: false, carryForwardAllowed: true, maxCarryForward: 4 },
@@ -27,11 +50,10 @@ async function main() {
 
   console.log("✅ Leave policies seeded");
 
-  // Step 2: Fetch existing users
+  // ---------------- STEP 3: Leave Balances ----------------
   const users = await prisma.user.findMany();
   const currentYear = new Date().getFullYear();
 
-  // Step 3: Create LeaveBalances
   for (const user of users) {
     for (const policy of leavePolicies) {
       await prisma.leaveBalance.upsert({
