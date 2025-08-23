@@ -46,32 +46,37 @@ enum AuditAction {
 // Models
 //
 model User {
-   id              String    @id @default(cuid())
-  username        String    @unique            
-  auth0Id         String?   @unique           
-  email           String    @unique
-  password        String                        
-  firstName       String
-  lastName        String
-  employeeId      String    @unique
-  role            UserRole  @default(EMPLOYEE)
-  managerId       String?
-  departmentId    String?
-  isActive        Boolean   @default(true)
-  joinDate        DateTime  @default(now())    
-  profileImage    String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  username     String   @unique
+  auth0Id      String?  @unique
+  email        String   @unique
+  password     String
+  firstName    String
+  lastName     String
+  employeeId   String   @unique
+  role         UserRole @default(EMPLOYEE)
+  managerId    String?
+  hrId         String?   // 👈 NEW: reference to HR user
+  departmentId String?
+  isActive     Boolean  @default(true)
+  joinDate     DateTime @default(now())
+  profileImage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Relations
-   manager         User?        @relation("ManagerEmployee", fields: [managerId], references: [id])
-  employees       User[]       @relation("ManagerEmployee")
-  department      Department?  @relation(fields: [departmentId], references: [id])
-  leaveRequests   Leave[]      @relation("LeaveRequester")
-  approvedLeaves  Leave[]      @relation("LeaveApprover")
-  leaveBalances   LeaveBalance[]
-  auditLogs       AuditLog[]
-  notifications   Notification[]
+  manager        User?          @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees      User[]         @relation("ManagerEmployee")
+
+  hr             User?          @relation("HREmployee", fields: [hrId], references: [id])   // 👈 NEW
+  hrEmployees    User[]         @relation("HREmployee")                                    // 👈 NEW
+
+  department     Department?    @relation(fields: [departmentId], references: [id])
+  leaveRequests  Leave[]        @relation("LeaveRequester")
+  approvedLeaves Leave[]        @relation("LeaveApprover")
+  leaveBalances  LeaveBalance[]
+  auditLogs      AuditLog[]
+  notifications  Notification[]
 
   @@map("users")
 }
@@ -92,18 +97,18 @@ model Department {
 }
 
 model LeavePolicy {
-   id                    String    @id @default(cuid())
-  leaveType             LeaveType @unique   // 👈 added
-  annualQuota           Int
-  maxConsecutiveDays    Int?
-  minDaysNotice         Int       @default(1)
-  requiresApproval      Boolean   @default(true)
-  requiresDocument      Boolean   @default(false)
-  carryForwardAllowed   Boolean   @default(false)
-  maxCarryForward       Int?
-  isActive              Boolean   @default(true)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  leaveType           LeaveType @unique // 👈 added
+  annualQuota         Int
+  maxConsecutiveDays  Int?
+  minDaysNotice       Int       @default(1)
+  requiresApproval    Boolean   @default(true)
+  requiresDocument    Boolean   @default(false)
+  carryForwardAllowed Boolean   @default(false)
+  maxCarryForward     Int?
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   // Relations
   leaveBalances LeaveBalance[]
@@ -198,8 +203,8 @@ model Setting {
   dateFormat   String
   timeFormat   String
   language     String
-   createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Notification {
