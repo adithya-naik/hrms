@@ -147,7 +147,7 @@ export default function TeamLeaves() {
                           {leave.attachments.map((file: string, idx: number) => (
                             <li key={idx}>
                               <a
-  href={`http://localhost:5000/${file.replace(/\\/g, '/')}`}
+  href={`http://localhost:5000${file.replace(/\\/g, '/')}`}
   target="_blank"
   rel="noopener noreferrer"
   className="text-blue-600 underline flex items-center gap-1"
@@ -269,13 +269,13 @@ export default function TeamLeaves() {
                       {leave.attachments.map((file: string, idx: number) => (
                         <li key={idx}>
                           <a
-                            href={`http://localhost:5000${file}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline flex items-center gap-1"
-                          >
-                            <FileText className="h-4 w-4" /> {file.split('/').pop()}
-                          </a>
+                                            href={`http://localhost:5000${file}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-600 underline flex items-center gap-1"
+                                          >
+                                            <FileText className="h-4 w-4" /> {file.split('/').pop()}
+                                          </a>
                         </li>
                       ))}
                     </ul>

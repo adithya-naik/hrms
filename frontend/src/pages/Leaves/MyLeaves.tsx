@@ -204,7 +204,7 @@ export default function MyLeaves() {
                                     <ul className="mt-1 space-y-1">
                                       {selectedLeave.attachments.map((file: string, idx: number) => (
                                         <li key={idx}>
-                                             <a href={`http://localhost:5000/${file.replace(/\\/g, '/')}`}
+                                             <a href={`http://localhost:5000${file.replace(/\\/g, '/')}`}
   target="_blank"
   rel="noopener noreferrer"
   className="text-blue-600 underline flex items-center gap-1"

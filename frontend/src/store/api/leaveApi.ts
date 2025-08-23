@@ -3,6 +3,12 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import { RootState } from "../index";
 
 // ---------------- Types ----------------
+export interface DayStatus {
+  date: string; // 'YYYY-MM-DD'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejectedReason?: string;
+}
+
 export interface Leave {
   id: string;
   leaveType: string;
@@ -10,6 +16,7 @@ export interface Leave {
   endDate: string;
   totalDays: number;
   status: string;
+  dayStatuses?: DayStatus[];
   requester?: {
     id: string;
     firstName: string;
@@ -78,14 +85,14 @@ export const leaveApi = createApi({
     }),
 
     createLeave: builder.mutation<any, FormData>({
-  query: (formData) => ({
-    url: "",
-    method: "POST",
+      query: (formData) => ({
+        url: "",
+        method: "POST",
     body: formData, // FormData will include files and other fields
     // IMPORTANT: Do NOT set headers manually — fetchBaseQuery will set multipart/form-data automatically
-  }),
-  invalidatesTags: ["Leave", "LeaveBalance"],
-}),
+      }),
+      invalidatesTags: ["Leave", "LeaveBalance"],
+    }),
 
     getLeaveBalances: builder.query<any, number>({
       query: (year) => ({
@@ -129,6 +136,12 @@ export const leaveApi = createApi({
         params,
       }),
       providesTags: ["TeamLeave"],
+    }),
+
+    // ---- Day-wise Leave Update ----
+    dayWiseUpdateLeave: builder.mutation<Leave, { id: string; dayStatuses: DayStatus[] }>({
+      query: ({ id, dayStatuses }) => ({ url: `/${id}/day-status`, method: "PATCH", body: { dayStatuses } }),
+      invalidatesTags: ["Leave", "TeamLeave", "LeaveBalance"],
     }),
 
     // ---- Leave Policy Endpoints ----
@@ -193,6 +206,9 @@ export const {
   useRejectLeaveMutation,
   useCancelLeaveMutation,
   useGetTeamLeavesQuery,
+
+  // ✅ Day-wise leave update
+  useDayWiseUpdateLeaveMutation,
 
   // Policies
   useGetLeavePoliciesQuery,

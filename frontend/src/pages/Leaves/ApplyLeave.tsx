@@ -44,7 +44,7 @@ export default function ApplyLeave() {
 
   const { data: policiesData } = useGetLeavePoliciesQuery(undefined);
   const [createLeave] = useCreateLeaveMutation();
-
+console.log(policiesData);
   const form = useForm<LeaveFormData>({
     resolver: zodResolver(leaveSchema),
     defaultValues: {
