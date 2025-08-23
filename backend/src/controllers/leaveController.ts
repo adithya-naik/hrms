@@ -623,6 +623,47 @@ console.log("\n\n\User from token:\n\n\n", req.user);
     }
   }
 
+ async updateDayStatuses(req: AuthRequest, res: Response) {
+  const { id } = req.params // leaveId
+  const { dayStatuses } = req.body as {
+    dayStatuses: { date: string; status: LeaveStatus; rejectedReason?: string }[]
+  }
+
+  const leave = await prisma.leave.findUnique({
+    where: { id },
+    include: { requester: true },
+  })
+
+  if (!leave) throw createError('Leave request not found', 404)
+
+  if (req.user!.role === UserRole.MANAGER && leave.requester.managerId !== req.user!.id) {
+    throw createError('You can only update leaves for your team members', 403)
+  }
+
+  // Upsert each day status
+  await Promise.all(
+    dayStatuses.map(d =>
+      prisma.leaveDayStatus.upsert({
+        where: { leaveId_date: { leaveId: id, date: new Date(d.date) } },
+        update: { status: d.status, reason: d.rejectedReason },
+        create: { leaveId: id, date: new Date(d.date), status: d.status, reason: d.rejectedReason },
+      })
+    )
+  )
+
+  // Fetch all updated day statuses
+  const updatedDays = await prisma.leaveDayStatus.findMany({ where: { leaveId: id } })
+
+  // Update parent leave status
+  if (updatedDays.every(d => d.status === LeaveStatus.REJECTED)) {
+    await prisma.leave.update({ where: { id }, data: { status: LeaveStatus.REJECTED } })
+  } else if (updatedDays.some(d => d.status === LeaveStatus.APPROVED)) {
+    await prisma.leave.update({ where: { id }, data: { status: LeaveStatus.PARTIAL } })
+  }
+
+  res.json({ success: true, dayStatuses: updatedDays })
+}
+
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
     const policy = await prisma.leavePolicy.findFirst({
@@ -630,6 +671,8 @@ console.log("\n\n\User from token:\n\n\n", req.user);
     });
     return policy?.id || '';
   }
+
+  
 }
 
 export const leaveController = new LeaveController();

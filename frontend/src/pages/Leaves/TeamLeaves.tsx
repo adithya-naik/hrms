@@ -1,75 +1,113 @@
-import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Search, Filter, Eye, Check, X, Calendar, Clock, User, FileText } from 'lucide-react';
-import { useGetTeamLeavesQuery, useApproveLeaveMutation, useRejectLeaveMutation } from '@/store/api/leaveApi';
-import { format } from 'date-fns';
-import { toast } from '@/components/ui/sonner';
+"use client"
+
+import { useState, useMemo } from 'react'
+import { format } from 'date-fns'
+import { toast } from '@/components/ui/sonner'
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle
+} from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
+import { FileText, Eye, Check, X, Search, Filter } from 'lucide-react'
+
+import { useGetTeamLeavesQuery, useApproveLeaveMutation, useRejectLeaveMutation } from '@/store/api/leaveApi'
+import DayWiseReject from '@/components/DayWiseReject'
+
+type UserType = {
+  firstName: string
+  lastName: string
+  employeeId?: string
+}
+
+type LeaveDayStatus = {
+  date: string
+  status: string
+}
+
+type LeaveType = {
+  id: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  totalDays: number
+  status: string
+  appliedDate: string
+  attachments?: string[]
+  reason?: string
+  requester: UserType
+  dayStatuses?: LeaveDayStatus[]
+}
 
 export default function TeamLeaves() {
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState<string | undefined>(undefined);
-  const [search, setSearch] = useState('');
-  const [selectedLeave, setSelectedLeave] = useState<any>(null);
-  const [rejectionReason, setRejectionReason] = useState('');
-  const filterStatus = status === 'all' ? undefined : status;
+  const [page, setPage] = useState(1)
+  const [status, setStatus] = useState<string | undefined>(undefined)
+  const [search, setSearch] = useState('')
+  const [selectedLeaveId, setSelectedLeaveId] = useState<string | null>(null)
+  const [rejectionReason, setRejectionReason] = useState('')
+
+  const filterStatus = status === 'all' ? undefined : status
 
   const { data: leavesData, isLoading } = useGetTeamLeavesQuery({
     page,
     limit: 10,
     status: filterStatus,
-  });
+    search,
+  })
 
-  const [approveLeave] = useApproveLeaveMutation();
-  const [rejectLeave] = useRejectLeaveMutation();
+  const [approveLeave] = useApproveLeaveMutation()
+  const [rejectLeave] = useRejectLeaveMutation()
+
+  const leaves: LeaveType[] = leavesData?.leaves || []
+
+  const selectedLeave = useMemo(
+    () => leaves.find(l => l.id === selectedLeaveId) || null,
+    [selectedLeaveId, leaves]
+  )
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'APPROVED': return 'bg-green-100 text-green-800 border-green-200';
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200';
-      case 'CANCELLED': return 'bg-gray-100 text-gray-800 border-gray-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'APPROVED': return 'bg-green-100 text-green-800 border-green-200'
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200'
+      case 'CANCELLED': return 'bg-gray-100 text-gray-800 border-gray-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
-  };
+  }
 
-  const formatLeaveType = (type: string) => {
-    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-  };
+  const formatLeaveType = (type: string) => type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+  const canApproveReject = (leave: LeaveType) => leave.status === 'PENDING'
 
   const handleApproveLeave = async (leaveId: string) => {
     try {
-      await approveLeave(leaveId).unwrap();
-      toast.success('Leave request approved successfully');
-    } catch {
-      toast.error('Failed to approve leave request');
+      await approveLeave(leaveId).unwrap()
+      toast.success('Leave request approved successfully')
+    } catch (err: any) {
+      toast.error(err?.data?.message || 'Failed to approve leave request')
     }
-  };
+  }
 
   const handleRejectLeave = async (leaveId: string) => {
+    if (!rejectionReason.trim()) return
     try {
-      await rejectLeave({ id: leaveId, rejectionReason }).unwrap();
-      toast.success('Leave request rejected');
-      setRejectionReason('');
-    } catch {
-      toast.error('Failed to reject leave request');
+      await rejectLeave({ id: leaveId, rejectionReason }).unwrap()
+      toast.success('Leave request rejected')
+      setRejectionReason('')
+    } catch (err: any) {
+      toast.error(err?.data?.message || 'Failed to reject leave request')
     }
-  };
-
-  const canApproveReject = (leave: any) => leave.status === 'PENDING';
+  }
 
   if (isLoading) return (
     <div className="flex items-center justify-center min-h-[400px]">
       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
     </div>
-  );
+  )
 
   return (
     <div className="space-y-6">
@@ -126,7 +164,7 @@ export default function TeamLeaves() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leavesData?.leaves?.map((leave: any) => (
+                {leaves.map((leave) => (
                   <TableRow key={leave.id}>
                     <TableCell>
                       <div>
@@ -134,104 +172,102 @@ export default function TeamLeaves() {
                         <div className="text-sm text-muted-foreground">{leave.requester.employeeId}</div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">{formatLeaveType(leave.leaveType)}</TableCell>
+                    <TableCell>{formatLeaveType(leave.leaveType)}</TableCell>
                     <TableCell>{format(new Date(leave.startDate), 'MMM dd, yyyy')} - {format(new Date(leave.endDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{leave.totalDays}</TableCell>
                     <TableCell>{format(new Date(leave.appliedDate), 'MMM dd, yyyy')}</TableCell>
+                    <TableCell><Badge className={getStatusColor(leave.status)}>{leave.status}</Badge></TableCell>
                     <TableCell>
-                      <Badge className={getStatusColor(leave.status)}>{leave.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {leave.attachments?.length > 0 ? (
+                      {leave.attachments?.length ? (
                         <ul className="space-y-1">
-                          {leave.attachments.map((file: string, idx: number) => (
-                            <li key={idx}>
-                              <a
-  href={`http://localhost:5000${file.replace(/\\/g, '/')}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="text-blue-600 underline flex items-center gap-1"
->
-  <FileText className="h-4 w-4" /> {file.split(/[/\\]/).pop()}
-</a>
-
+                          {leave.attachments.map((file) => (
+                            <li key={file}>
+                              <a href={`http://localhost:5000${file}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-1">
+                                <FileText className="h-4 w-4" /> {file.split(/[/\\]/).pop()}
+                              </a>
                             </li>
                           ))}
                         </ul>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No files</span>
-                      )}
+                      ) : <span className="text-sm text-muted-foreground">No files</span>}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {/* Dialog for Details */}
+                        {/* View Details Dialog */}
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" onClick={() => setSelectedLeave(leave)}>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedLeaveId(leave.id)}>
                               <Eye className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle>Leave Request Details</DialogTitle>
-                              <DialogDescription>Review complete information about this leave request</DialogDescription>
                             </DialogHeader>
                             {selectedLeave && (
                               <div className="space-y-4">
-                                <div>
-                                  <label className="text-sm font-medium">Employee</label>
-                                  <p className="text-sm text-muted-foreground">{selectedLeave.requester.firstName} {selectedLeave.requester.lastName}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Leave Type</label>
-                                  <p className="text-sm text-muted-foreground">{formatLeaveType(selectedLeave.leaveType)}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Duration</label>
-                                  <p className="text-sm text-muted-foreground">{format(new Date(selectedLeave.startDate), 'MMMM dd, yyyy')} - {format(new Date(selectedLeave.endDate), 'MMMM dd, yyyy')}</p>
-                                </div>
-                                <div>
-                                  <label className="text-sm font-medium">Reason</label>
-                                  <p className="text-sm text-muted-foreground">{selectedLeave.reason}</p>
-                                </div>
-                                {selectedLeave.attachments?.length > 0 && (
+                                <div><strong>Employee:</strong> {selectedLeave.requester.firstName} {selectedLeave.requester.lastName}</div>
+                                <div><strong>Leave Type:</strong> {formatLeaveType(selectedLeave.leaveType)}</div>
+                                <div><strong>Duration:</strong> {format(new Date(selectedLeave.startDate), 'MMM dd, yyyy')} - {format(new Date(selectedLeave.endDate), 'MMM dd, yyyy')}</div>
+                                <div><strong>Reason:</strong> {selectedLeave.reason}</div>
+
+                                {selectedLeave.attachments?.length && (
                                   <div>
-                                    <label className="text-sm font-medium">Attachments</label>
-                                    <ul className="mt-1 space-y-1">
-                                      {selectedLeave.attachments.map((file: string, idx: number) => (
-                                        <li key={idx}>
-                                          <a
-                                            href={`http://localhost:5000${file}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 underline flex items-center gap-1"
-                                          >
-                                            <FileText className="h-4 w-4" /> {file.split('/').pop()}
+                                    <strong>Attachments:</strong>
+                                    <ul>
+                                      {selectedLeave.attachments.map(file => (
+                                        <li key={file}>
+                                          <a href={`http://localhost:5000${file}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-1">
+                                            <FileText className="h-4 w-4" /> {file.split(/[/\\]/).pop()}
                                           </a>
                                         </li>
                                       ))}
                                     </ul>
                                   </div>
                                 )}
+
                                 {canApproveReject(selectedLeave) && (
                                   <div className="flex gap-2 pt-4 border-t">
-                                    <Button onClick={() => handleApproveLeave(selectedLeave.id)} className="flex-1"><Check className="h-4 w-4 mr-2" />Approve</Button>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <Button variant="destructive" className="flex-1"><X className="h-4 w-4 mr-2" />Reject</Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                          <AlertDialogTitle>Reject Leave Request</AlertDialogTitle>
-                                          <AlertDialogDescription>Please provide a reason for rejecting this leave request.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <Textarea placeholder="Enter rejection reason..." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
-                                        <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleRejectLeave(selectedLeave.id)} disabled={!rejectionReason.trim()}>Reject Leave</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                    </AlertDialog>
+                                    <Button onClick={() => handleApproveLeave(selectedLeave.id)} className="flex-1">
+                                      <Check className="h-4 w-4 mr-2" />Approve
+                                    </Button>
+
+                                    {/* Day-wise Reject */}
+                                    {selectedLeave.dayStatuses && selectedLeave.dayStatuses.length > 0 && (
+                                      <Dialog open={!!selectedLeave} onOpenChange={(open) => { if (!open) setSelectedLeaveId(null) }}>
+                                        <DialogTrigger asChild>
+                                          <Button variant="destructive" className="flex-1">
+                                            <X className="h-4 w-4 mr-2" />Reject Days
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-lg">
+                                          <DayWiseReject leave={selectedLeave} onClose={() => setSelectedLeaveId(null)} />
+                                        </DialogContent>
+                                      </Dialog>
+                                    )}
+
+                                    {/* Normal Reject */}
+                                    {!selectedLeave.dayStatuses && (
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="destructive" className="flex-1">
+                                            <X className="h-4 w-4 mr-2" />Reject
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Reject Leave Request</AlertDialogTitle>
+                                            <p>Please provide a reason for rejecting this leave request.</p>
+                                          </AlertDialogHeader>
+                                          <Textarea placeholder="Enter rejection reason..." value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} />
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleRejectLeave(selectedLeave.id)} disabled={!rejectionReason.trim()}>
+                                              Reject Leave
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -245,96 +281,8 @@ export default function TeamLeaves() {
               </TableBody>
             </Table>
           </div>
-
-          {/* Mobile Cards */}
-          <div className="md:hidden space-y-4">
-            {leavesData?.leaves?.map((leave: any) => (
-              <Card key={leave.id}>
-                <CardContent>
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{leave.requester.firstName} {leave.requester.lastName}</span>
-                      </div>
-                      <h3 className="font-medium">{formatLeaveType(leave.leaveType)}</h3>
-                      <p className="text-sm text-muted-foreground">{format(new Date(leave.startDate), 'MMM dd')} - {format(new Date(leave.endDate), 'MMM dd, yyyy')}</p>
-                    </div>
-                    <Badge className={getStatusColor(leave.status)}>{leave.status}</Badge>
-                  </div>
-
-                  {/* Attachments */}
-                  {leave.attachments?.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {leave.attachments.map((file: string, idx: number) => (
-                        <li key={idx}>
-                          <a
-                                            href={`http://localhost:5000${file}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 underline flex items-center gap-1"
-                                          >
-                                            <FileText className="h-4 w-4" /> {file.split('/').pop()}
-                                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {leave.totalDays} days</div>
-                      <div className="flex items-center gap-1"><Clock className="h-4 w-4" /> {format(new Date(leave.appliedDate), 'MMM dd')}</div>
-                    </div>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => setSelectedLeave(leave)}><Eye className="h-4 w-4" /></Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader><DialogTitle>Leave Request Details</DialogTitle></DialogHeader>
-                        {selectedLeave && (
-                          <div className="space-y-4">
-                            <div>
-                              <label className="text-sm font-medium">Employee</label>
-                              <p className="text-sm text-muted-foreground">{selectedLeave.requester.firstName} {selectedLeave.requester.lastName}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Leave Type</label>
-                              <p className="text-sm text-muted-foreground">{formatLeaveType(selectedLeave.leaveType)}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Duration</label>
-                              <p className="text-sm text-muted-foreground">{format(new Date(selectedLeave.startDate), 'MMMM dd, yyyy')} - {format(new Date(selectedLeave.endDate), 'MMMM dd, yyyy')}</p>
-                            </div>
-                            <div>
-                              <label className="text-sm font-medium">Reason</label>
-                              <p className="text-sm text-muted-foreground">{selectedLeave.reason}</p>
-                            </div>
-                            {selectedLeave.attachments?.length > 0 && (
-                              <div>
-                                <label className="text-sm font-medium">Attachments</label>
-                                <ul className="mt-1 space-y-1">
-                                  {selectedLeave.attachments.map((file: string, idx: number) => (
-                                    <li key={idx}>
-                                      <a href={`http://localhost:5000${file}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline flex items-center gap-1">
-                                        <FileText className="h-4 w-4" /> {file.split('/').pop()}
-                                      </a>
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }
