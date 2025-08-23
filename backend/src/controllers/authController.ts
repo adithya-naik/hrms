@@ -119,20 +119,38 @@ class AuthController {
     res.status(201).json({ user, token });
   }
 
-  async getProfile(req: AuthRequest, res: Response) {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      include: {
-        department: true,
-        manager: { select: { id: true, firstName: true, lastName: true, email: true } },
-        leaveBalances: { where: { year: new Date().getFullYear() }, include: { leavePolicy: true } },
+async getProfile(req: AuthRequest, res: Response) {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    include: {
+      department: true,
+      manager: { 
+        select: { 
+          id: true, 
+          firstName: true, 
+          lastName: true, 
+          email: true 
+        } 
       },
-    });
+      hr: {  // 👈 Include HR details
+        select: { 
+          id: true, 
+          firstName: true, 
+          lastName: true, 
+          email: true 
+        }
+      },
+      leaveBalances: { 
+        where: { year: new Date().getFullYear() }, 
+        include: { leavePolicy: true } 
+      },
+    },
+  });
 
-    if (!user) throw createError('User not found', 404);
+  if (!user) throw createError('User not found', 404);
 
-    res.json({ user });
-  }
+  res.json({ user });
+}
 
   async updateProfile(req: AuthRequest, res: Response) {
     const data = updateProfileSchema.parse(req.body);

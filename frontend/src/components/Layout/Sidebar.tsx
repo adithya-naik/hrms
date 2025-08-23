@@ -23,8 +23,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 const navigation = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "My Leaves", href: "/app/leaves", icon: Calendar, roles: ["EMPLOYEE", "MANAGER", "HR"] },
-  { name: "Team Leaves", href: "/app/team-leaves", icon: Users, roles: ["MANAGER", "HR","ADMIN"] },
-  { name: "Leave Requests", href: "/app/leave-requests", icon: FileText, roles: ["MANAGER", "HR"] },
+  { name: "Team Leaves", href: "/app/team-leaves", icon: Users, roles: ["MANAGER"] },
+  { name: "Leave Requests", href: "/app/leave-requests", icon: FileText, roles: ["MANAGER", "HR","ADMIN"] },
   { name: "Reports", href: "/app/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
   { name: "Users", href: "/app/users", icon: Users, roles: ["HR", "ADMIN"] },
   { name: "Settings", href: "/app/settings", icon: Settings, roles: ["ADMIN"] },
