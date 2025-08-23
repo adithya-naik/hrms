@@ -5,3 +5,56 @@ pQAAAAtzc2gtZWQyNTUxOQAAACDQGkkq65moHbIPCmIqa8l5IXY1RgLS+XvsmXncDFsnkA
 AAAEBKcZopUO0WAPn3c0uJPKzUi7J4anXdKwpeSvCPpP3VgNAaSSrrmagdsg8KYipryXkh
 djVGAtL5e+yZedwMWyeQAAAAG2phdG90aGFkaXRoeWFuYWlrQGdtYWlsLmNvbQEC
 -----END OPENSSH PRIVATE KEY-----
+
+
+
+
+Who gets what (and what’s stored)
+
+On Apply (createLeave)
+
+Emails:
+
+Manager → “New Leave Request” (includes type, dates, reason).
+
+HR → “New Leave Request” (includes type, dates, reason).
+
+Requester → “We received your request” (includes type, dates, reason).
+
+Notifications table:
+
+Manager, HR → “New Leave Request …”
+
+Requester → “Leave Submitted …”
+
+AuditLog: CREATE with newValues = leave.
+
+On Approve (approveLeave)
+
+Email: Requester → “Leave Approved”.
+
+Notification: Requester → “Leave Approved …”
+
+AuditLog: APPROVE with status change.
+
+On Reject (rejectLeave)
+
+Email: Requester → “Leave Rejected” (includes rejection reason).
+
+Notification: Requester → “Leave Rejected …”
+
+AuditLog: REJECT with status + reason.
+
+On Cancel (cancelLeave)
+
+Notification: Requester → “Leave Cancelled …”
+
+AuditLog: CANCEL.
+
+Email logs: every send attempt is logged like
+
+✅ Email sent | leaveSubmitted | to=user@company.com
+
+❌ Email failed | leaveRequest | to=manager@company.com | err=...
+
+This matches your schema (notifications, audit_logs, settings) and your earlier controller style and imports. If you want me to also CC Admin users on submit, I can extend the controller to fetch role = ADMIN emails and loop them just like HR.
