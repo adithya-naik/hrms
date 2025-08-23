@@ -5,6 +5,7 @@ import { userApi } from './api/userApi';
 import { dashboardApi } from './api/dashboardApi';
 import { reportApi } from './api/reportApi';
 import { departmentApi } from './api/departmentApi';
+import { notificationApi } from "./api/notificationApi";
 import authReducer from './slices/authSlice';
 export const store = configureStore({
   reducer: {
@@ -15,6 +16,7 @@ export const store = configureStore({
     [dashboardApi.reducerPath]: dashboardApi.reducer,
     [reportApi.reducerPath]: reportApi.reducer,
     [departmentApi.reducerPath]: departmentApi.reducer,
+     [notificationApi.reducerPath]: notificationApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -28,6 +30,7 @@ export const store = configureStore({
       dashboardApi.middleware,
       reportApi.middleware,
       departmentApi.middleware,
+      notificationApi.middleware,
     ),
 });
 

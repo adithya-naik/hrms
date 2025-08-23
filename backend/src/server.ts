@@ -46,6 +46,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ---------------- Serve uploaded files ----------------
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// ---------------- Disable caching for API responses ----------------
+app.set('etag', false);
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // ---------------- Health check ----------------
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
