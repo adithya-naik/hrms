@@ -20,7 +20,7 @@ interface RecentActivityProps {
 export function RecentActivity({ recentLeaves, upcomingLeaves }: RecentActivityProps) {
   const { data: profile, isLoading } = useGetProfileQuery();
   const userRole = profile?.user.role;
-console.log(userRole)
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'APPROVED':
@@ -44,6 +44,13 @@ console.log(userRole)
   };
 
   if (isLoading) return <p>Loading recent activity...</p>;
+
+  const formatLeaveTypeWithLOP = (leave: any) => {
+    if (leave.isLOP) {
+      return `${formatLeaveType(leave.leaveType)} (LOP)`;
+    }
+    return formatLeaveType(leave.leaveType);
+  };
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -87,7 +94,7 @@ console.log(userRole)
                         </span>
                       </div>
                     )}
-                    <p className="font-medium">{formatLeaveType(leave.leaveType)}</p>
+                    <p className="font-medium">{formatLeaveTypeWithLOP(leave)}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span>
                         {format(new Date(leave.startDate), 'MMM dd')} -{' '}
@@ -151,7 +158,7 @@ console.log(userRole)
                         </span>
                       </div>
                     )}
-                    <p className="font-medium">{formatLeaveType(leave.leaveType)}</p>
+                    <p className="font-medium">{formatLeaveTypeWithLOP(leave)}</p>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span>
                         {format(new Date(leave.startDate), 'MMM dd')} -{' '}

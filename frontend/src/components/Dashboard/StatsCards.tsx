@@ -1,5 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, Users, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Calendar, Clock, Users, TrendingUp, CheckCircle } from 'lucide-react';
 
 interface StatsCardsProps {
   stats: any;

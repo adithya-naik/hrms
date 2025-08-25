@@ -1,50 +1,84 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon, Upload, X, ArrowLeft } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Link, useNavigate } from 'react-router-dom';
-import { useCreateLeaveMutation, useGetLeavePoliciesQuery } from '@/store/api/leaveApi';
-import { toast } from '@/components/ui/sonner';
-import { format, differenceInCalendarDays } from 'date-fns';
+"use client"
 
-const leaveSchema = z.object({
-  leaveType: z.string().min(1, 'Please select a leave type'),
-  startDate: z.date({
-    required_error: 'Start date is required',
-  }),
-  endDate: z.date({
-    required_error: 'End date is required',
-  }),
-  reason: z.string().min(10, 'Reason must be at least 10 characters'),
-  isHalfDay: z.boolean().default(false),
-  emergencyLeave: z.boolean().default(false),
-  attachments: z.array(z.string()).default([]),
-}).refine((data) => data.endDate >= data.startDate, {
-  message: "End date must be after start date",
-  path: ["endDate"],
-});
+import type React from "react"
 
-type LeaveFormData = z.infer<typeof leaveSchema>;
+import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { parseISO, startOfDay } from "date-fns"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { CalendarIcon, Upload, X, ArrowLeft } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Link, useNavigate } from "react-router-dom"
+import {
+  useCreateLeaveMutation,
+  useGetLeavePoliciesQuery,
+  useGetLeaveBalancesQuery,
+  useGetMyLeaveDatesQuery,
+} from "@/store/api/leaveApi"
+import { toast } from "@/components/ui/sonner"
+import { format, differenceInCalendarDays } from "date-fns"
+
+// ---------------- Schema ----------------
+const leaveSchema = z
+  .object({
+    leaveType: z.string().min(1, "Please select a leave type"),
+    startDate: z.date({ required_error: "Start date is required" }),
+    endDate: z.date({ required_error: "End date is required" }),
+    reason: z.string().min(10, "Reason must be at least 10 characters"),
+    isHalfDay: z.boolean().default(false),
+    emergencyLeave: z.boolean().default(false),
+    attachments: z.array(z.string()).default([]),
+  })
+  .refine((data) => data.endDate >= data.startDate, {
+    message: "End date must be after start date",
+    path: ["endDate"],
+  })
+  // ✅ Rule: SICK leave must start from today
+  .refine(
+    (data) => {
+      if (data.leaveType === "SICK") {
+        const today = startOfDay(new Date())
+        const start = startOfDay(new Date(data.startDate))
+        return start.getTime() === today.getTime()
+      }
+      return true
+    },
+    {
+      message: "Sick leave must start from today",
+      path: ["startDate"],
+    },
+  )
+
+type LeaveFormData = z.infer<typeof leaveSchema>
+
+// ---------------- Status Colors ----------------
+const statusColors: Record<string, string> = {
+  PENDING: "bg-yellow-400 text-black",
+  APPROVED: "bg-green-500 text-white",
+  REJECTED: "bg-red-500 text-white",
+  CANCELLED: "bg-gray-400 text-white",
+}
 
 export default function ApplyLeave() {
-  const navigate = useNavigate();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const navigate = useNavigate()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
 
-  const { data: policiesData } = useGetLeavePoliciesQuery(undefined);
-  const [createLeave] = useCreateLeaveMutation();
-console.log(policiesData);
+  const { data: policiesData } = useGetLeavePoliciesQuery()
+  const { data: balancesData } = useGetLeaveBalancesQuery(new Date().getFullYear())
+  const { data: myLeaves } = useGetMyLeaveDatesQuery()
+
+  const [createLeave] = useCreateLeaveMutation()
+
   const form = useForm<LeaveFormData>({
     resolver: zodResolver(leaveSchema),
     defaultValues: {
@@ -52,91 +86,148 @@ console.log(policiesData);
       emergencyLeave: false,
       attachments: [],
     },
-  });
+  })
 
-  const watchedStartDate = form.watch('startDate');
-  const watchedEndDate = form.watch('endDate');
-  const watchedIsHalfDay = form.watch('isHalfDay');
+  const watchedLeaveType = form.watch("leaveType")
+  const watchedStartDate = form.watch("startDate")
+  const watchedEndDate = form.watch("endDate")
+  const watchedIsHalfDay = form.watch("isHalfDay")
 
+  // Auto-set end date for sick leave when start date is selected
+  useEffect(() => {
+    if (watchedLeaveType === "SICK" && watchedStartDate && !watchedEndDate) {
+      form.setValue("endDate", watchedStartDate)
+    }
+  }, [watchedLeaveType, watchedStartDate, watchedEndDate, form])
+
+  // ---------------- Calculate Days ----------------
   const calculateDays = () => {
-    if (!watchedStartDate || !watchedEndDate) return 0;
-    if (watchedIsHalfDay) return 0.5;
-    
-    const diffTime = Math.abs(watchedEndDate.getTime() - watchedStartDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return diffDays;
-  };
-
-  const watchedLeaveType = form.watch('leaveType');
-
-
-// Check 3-day rule
-const isCasualLeaveTooSoon = () => {
-  if (watchedLeaveType === 'CASUAL' && watchedStartDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const start = new Date(watchedStartDate);
-    start.setHours(0, 0, 0, 0);
-    const diffDays = differenceInCalendarDays(start, today);
-    return diffDays < 3;
+    if (!watchedStartDate || !watchedEndDate) return 0
+    if (watchedIsHalfDay) return 0.5
+    const diffTime = Math.abs(watchedEndDate.getTime() - watchedStartDate.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    return diffDays
   }
-  return false;
-};
+
+  // ---------------- Balances & Rules ----------------
+  const sickBalance = balancesData?.balances?.find((b: any) => b.leavePolicy?.leaveType === "SICK")
+  const availableSick = sickBalance?.availableDays ?? 0
+
+  const totalRequestedDays = calculateDays()
+  const lopDays = watchedLeaveType === "SICK" ? Math.max(0, totalRequestedDays - availableSick) : 0
+  const paidDays = totalRequestedDays - lopDays
+
+  const isCasualLeaveTooSoon = () => {
+    if (watchedLeaveType === "CASUAL" && watchedStartDate) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const start = new Date(watchedStartDate)
+      start.setHours(0, 0, 0, 0)
+      const diffDays = differenceInCalendarDays(start, today)
+      return diffDays < 3
+    }
+    return false
+  }
+
+  // ---------------- Leave Days Processing ----------------
+  const leaveDays =
+    myLeaves?.map((leave: any) => ({
+      date: parseISO(leave.date),
+      status: leave.dayStatus,
+    })) || []
+
+  // 🔥 FIX: Only disable dates that are NOT cancelled or rejected
+  // Cancelled and rejected leaves should be available for new applications
+  const disabledDates = leaveDays
+    .filter((ld) => ld.status === "PENDING" || ld.status === "APPROVED") // Only block pending/approved
+    .map((ld) => new Date(ld.date))
+
+  // Separate leave days by status for visual highlighting
+  const pendingDays = leaveDays.filter((ld) => ld.status === "PENDING").map((ld) => new Date(ld.date))
+
+  const approvedDays = leaveDays.filter((ld) => ld.status === "APPROVED").map((ld) => new Date(ld.date))
+
+  const rejectedDays = leaveDays.filter((ld) => ld.status === "REJECTED").map((ld) => new Date(ld.date))
+
+  const cancelledDays = leaveDays.filter((ld) => ld.status === "CANCELLED").map((ld) => new Date(ld.date))
+
+  // ---------------- Submit ----------------
   const onSubmit = async (data: LeaveFormData) => {
-
+    // ✅ check casual leave rule
     if (isCasualLeaveTooSoon()) {
-    toast.error('Casual leave must be applied at least 3 days in advance.');
-    return;
-  }
-
-  setIsSubmitting(true);
-  try {
-    // Create FormData to handle files
-    const formData = new FormData();
-    formData.append('leaveType', data.leaveType);
-    formData.append('startDate', data.startDate.toISOString());
-    formData.append('endDate', data.endDate.toISOString());
-    formData.append('reason', data.reason);
-    formData.append('isHalfDay', String(data.isHalfDay));
-    formData.append('emergencyLeave', String(data.emergencyLeave));
-
-    // Append selected files
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    if (fileInput?.files) {
-      Array.from(fileInput.files).forEach(file => formData.append('attachments', file));
+      toast.error("Casual leave must be applied at least 3 days in advance.")
+      return
     }
 
-    // Send FormData to backend
-    await createLeave(formData).unwrap();
+    // ✅ check sick leave rule before sending (FIXED)
+    if (data.leaveType === "SICK") {
+      const today = startOfDay(new Date()) // Removed subDays(1)
+      const start = startOfDay(new Date(data.startDate))
 
-    toast.success('Leave request submitted successfully!');
-    navigate('/app/leaves');
-  } catch (error: any) {
-    toast.error(error?.data?.error || 'Failed to submit leave request');
-  } finally {
-    setIsSubmitting(false);
+      if (start.getTime() !== today.getTime()) {
+        toast.error("Sick leave can only be applied for today.")
+        return
+      }
+    }
+
+    setIsSubmitting(true)
+    try {
+      // Fix timezone issue - send date in local timezone format
+      const formatDateForSubmission = (date: Date) => {
+        // Create a new date in local timezone at start of day
+        const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+        return localDate.toISOString()
+      }
+
+      const formData = new FormData()
+      formData.append("leaveType", data.leaveType)
+      formData.append("startDate", formatDateForSubmission(data.startDate))
+      formData.append("endDate", formatDateForSubmission(data.endDate))
+      formData.append("reason", data.reason)
+      formData.append("isHalfDay", String(data.isHalfDay))
+      formData.append("emergencyLeave", String(data.emergencyLeave))
+
+      const fileInput = document.getElementById("file-upload") as HTMLInputElement
+      if (fileInput?.files) {
+        Array.from(fileInput.files).forEach((file) => formData.append("attachments", file))
+      }
+
+      await createLeave(formData).unwrap()
+      toast.success("Leave request submitted successfully!")
+      navigate("/app/leaves")
+    } catch (error: any) {
+      toast.error(error?.data?.error || "Failed to submit leave request")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
-};
 
-
+  // ---------------- File Upload ----------------
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
+    const files = event.target.files
     if (files) {
-      // In a real app, you would upload these files to your server
-      // For now, we'll just simulate the upload
-      const fileNames = Array.from(files).map(file => file.name);
-      setUploadedFiles(prev => [...prev, ...fileNames]);
+      const fileNames = Array.from(files).map((file) => file.name)
+      setUploadedFiles((prev) => [...prev, ...fileNames])
     }
-  };
+  }
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const formatLeaveType = (type: string) => {
-    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-  };
+    return type
+      .replace("_", " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+  }
 
+  // Helper function to check if a date is disabled due to existing leave
+  const isDateDisabledByLeave = (date: Date) => {
+    return disabledDates.some((d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd"))
+  }
+
+  // ---------------- UI ----------------
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -162,6 +253,7 @@ const isCasualLeaveTooSoon = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Leave Type */}
               <FormField
                 control={form.control}
                 name="leaveType"
@@ -187,6 +279,7 @@ const isCasualLeaveTooSoon = () => {
                 )}
               />
 
+              {/* Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -201,14 +294,10 @@ const isCasualLeaveTooSoon = () => {
                               variant="outline"
                               className={cn(
                                 "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
+                                !field.value && "text-muted-foreground",
                               )}
                             >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
@@ -218,7 +307,31 @@ const isCasualLeaveTooSoon = () => {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < new Date()}
+                            disabled={(date) => {
+                              // Allow today for sick leave, otherwise disable past dates
+                              const today = startOfDay(new Date())
+                              const dateToCheck = startOfDay(date)
+
+                              if (watchedLeaveType === "SICK") {
+                                // For sick leave, only allow today
+                                return dateToCheck.getTime() !== today.getTime() || isDateDisabledByLeave(date)
+                              } else {
+                                // For other leave types, disable past dates (before today)
+                                return dateToCheck < today || isDateDisabledByLeave(date)
+                              }
+                            }}
+                            modifiers={{
+                              pending: pendingDays,
+                              approved: approvedDays,
+                              rejected: rejectedDays,
+                              cancelled: cancelledDays,
+                            }}
+                            modifiersClassNames={{
+                              pending: statusColors.PENDING,
+                              approved: statusColors.APPROVED,
+                              rejected: statusColors.REJECTED,
+                              cancelled: statusColors.CANCELLED,
+                            }}
                             initialFocus
                           />
                         </PopoverContent>
@@ -241,14 +354,10 @@ const isCasualLeaveTooSoon = () => {
                               variant="outline"
                               className={cn(
                                 "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
+                                !field.value && "text-muted-foreground",
                               )}
                             >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
@@ -258,7 +367,31 @@ const isCasualLeaveTooSoon = () => {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < (watchedStartDate || new Date())}
+                            disabled={(date) => {
+                              const today = startOfDay(new Date())
+                              const dateToCheck = startOfDay(date)
+
+                              if (watchedLeaveType === "SICK") {
+                                const startDate = watchedStartDate ? startOfDay(watchedStartDate) : today
+                                return dateToCheck < startDate || isDateDisabledByLeave(date)
+                              } else {
+                                // For other leave types
+                                const startDate = watchedStartDate ? startOfDay(watchedStartDate) : today
+                                return dateToCheck < startDate || isDateDisabledByLeave(date)
+                              }
+                            }}
+                            modifiers={{
+                              pending: pendingDays,
+                              approved: approvedDays,
+                              rejected: rejectedDays,
+                              cancelled: cancelledDays,
+                            }}
+                            modifiersClassNames={{
+                              pending: statusColors.PENDING,
+                              approved: statusColors.APPROVED,
+                              rejected: statusColors.REJECTED,
+                              cancelled: statusColors.CANCELLED,
+                            }}
                             initialFocus
                           />
                         </PopoverContent>
@@ -277,6 +410,53 @@ const isCasualLeaveTooSoon = () => {
                 </div>
               )}
 
+              {/* Calendar Legend */}
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm font-medium mb-2">Calendar Legend:</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-yellow-400"></div>
+                    <span>Pending</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-green-500"></div>
+                    <span>Approved</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-red-500"></div>
+                    <span>Rejected (Available)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded bg-gray-400"></div>
+                    <span>Cancelled (Available)</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  * You can apply for leave on rejected or cancelled dates
+                </p>
+              </div>
+
+              {/* SICK LOP warning */}
+              {watchedLeaveType === "SICK" && totalRequestedDays > 0 && (
+                <div className="p-4 mt-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-900">
+                  <p>
+                    You have <b>{availableSick}</b> SICK leave day{availableSick !== 1 ? "s" : ""} left.
+                    <br />
+                    Your request is for <b>{totalRequestedDays}</b> day{totalRequestedDays !== 1 ? "s" : ""}.
+                  </p>
+                  {lopDays > 0 ? (
+                    <p>
+                      <b>{paidDays}</b> day{paidDays !== 1 ? "s are" : " is"} paid SICK leave, <br />
+                      <b>{lopDays}</b> day{lopDays !== 1 ? "s will be" : " will be"} counted as <b>LOP (Loss of Pay)</b>
+                      .
+                    </p>
+                  ) : (
+                    <p>All days will be counted as paid SICK leave.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Reason */}
               <FormField
                 control={form.control}
                 name="reason"
@@ -290,14 +470,13 @@ const isCasualLeaveTooSoon = () => {
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription>
-                      Minimum 10 characters required
-                    </FormDescription>
+                    <FormDescription>Minimum 10 characters required</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              {/* Half Day + Emergency */}
               <div className="space-y-4">
                 <FormField
                   control={form.control}
@@ -305,43 +484,33 @@ const isCasualLeaveTooSoon = () => {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                       <div className="space-y-1 leading-none">
                         <FormLabel>Half Day Leave</FormLabel>
-                        <FormDescription>
-                          Check this if you're applying for a half day leave
-                        </FormDescription>
+                        <FormDescription>Check this if you're applying for a half day leave</FormDescription>
                       </div>
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="emergencyLeave"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                       <div className="space-y-1 leading-none">
                         <FormLabel>Emergency Leave</FormLabel>
-                        <FormDescription>
-                          Check this if this is an emergency leave request
-                        </FormDescription>
+                        <FormDescription>Check this if this is an emergency leave request</FormDescription>
                       </div>
                     </FormItem>
                   )}
                 />
               </div>
 
+              {/* Attachments */}
               <div className="space-y-4">
                 <FormLabel>Attachments (Optional)</FormLabel>
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
@@ -375,12 +544,7 @@ const isCasualLeaveTooSoon = () => {
                     {uploadedFiles.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
                         <span className="text-sm">{file}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeFile(index)}
-                        >
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
@@ -389,9 +553,10 @@ const isCasualLeaveTooSoon = () => {
                 )}
               </div>
 
+              {/* Submit */}
               <div className="flex gap-4 pt-4">
                 <Button type="submit" disabled={isSubmitting} className="flex-1">
-                  {isSubmitting ? 'Submitting...' : 'Submit Leave Request'}
+                  {isSubmitting ? "Submitting..." : "Submit Leave Request"}
                 </Button>
                 <Button type="button" variant="outline" asChild>
                   <Link to="/app/leaves">Cancel</Link>
@@ -402,5 +567,5 @@ const isCasualLeaveTooSoon = () => {
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

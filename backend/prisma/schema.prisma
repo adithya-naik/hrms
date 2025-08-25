@@ -20,10 +20,8 @@ enum UserRole {
 enum LeaveType {
   SICK
   CASUAL
-  VACATION
-  ACADEMIC
-  COMP_OFF
   WFH
+  LOP
 }
 
 enum LeaveStatus {
@@ -31,6 +29,7 @@ enum LeaveStatus {
   APPROVED
   REJECTED
   CANCELLED
+  PARTIAL // 🔥 NEW: For partial approvals
 }
 
 enum AuditAction {
@@ -56,7 +55,7 @@ model User {
   employeeId   String   @unique
   role         UserRole @default(EMPLOYEE)
   managerId    String?
-  hrId         String?   // 👈 NEW: reference to HR user
+  hrId         String? // 👈 NEW: reference to HR user
   departmentId String?
   isActive     Boolean  @default(true)
   joinDate     DateTime @default(now())
@@ -65,11 +64,11 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  manager        User?          @relation("ManagerEmployee", fields: [managerId], references: [id])
-  employees      User[]         @relation("ManagerEmployee")
+  manager   User?  @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees User[] @relation("ManagerEmployee")
 
-  hr             User?          @relation("HREmployee", fields: [hrId], references: [id])   // 👈 NEW
-  hrEmployees    User[]         @relation("HREmployee")                                    // 👈 NEW
+  hr          User?  @relation("HREmployee", fields: [hrId], references: [id]) // 👈 NEW
+  hrEmployees User[] @relation("HREmployee") // 👈 NEW
 
   department     Department?    @relation(fields: [departmentId], references: [id])
   leaveRequests  Leave[]        @relation("LeaveRequester")
@@ -98,7 +97,7 @@ model Department {
 
 model LeavePolicy {
   id                  String    @id @default(cuid())
-  leaveType           LeaveType @unique // 👈 added
+  leaveType           LeaveType @unique
   annualQuota         Int
   maxConsecutiveDays  Int?
   minDaysNotice       Int       @default(1)
@@ -111,7 +110,8 @@ model LeavePolicy {
   updatedAt           DateTime  @updatedAt
 
   // Relations
-  leaveBalances LeaveBalance[]
+  leaves        Leave[]        @relation("LeavePolicyToLeaves")
+  leaveBalances LeaveBalance[] @relation("LeavePolicyToBalances")
 
   @@map("leave_policies")
 }
@@ -120,6 +120,8 @@ model Leave {
   id              String           @id @default(cuid())
   requesterId     String
   approverId      String?
+  leavePolicyId   String
+  leavePolicy     LeavePolicy      @relation("LeavePolicyToLeaves", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
   leaveType       LeaveType
   startDate       DateTime
   endDate         DateTime
@@ -134,11 +136,11 @@ model Leave {
   emergencyLeave  Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  dayStatuses     LeaveDayStatus[]
+  dayStatuses     LeaveDayStatus[] // 🔥 CASCADE DELETE handled by Prisma
+  isLOP           Boolean          @default(false)
 
-  // Relations
-  requester User  @relation("LeaveRequester", fields: [requesterId], references: [id])
-  approver  User? @relation("LeaveApprover", fields: [approverId], references: [id])
+  requester User  @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  approver  User? @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull) // 🔥 ADDED SET NULL
 
   @@map("leaves")
 }
@@ -151,7 +153,7 @@ model LeaveDayStatus {
   reason  String? // optional rejection reason
 
   // Relations
-  leave Leave @relation(fields: [leaveId], references: [id])
+  leave Leave @relation(fields: [leaveId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
 
   @@unique([leaveId, date])
   @@map("leave_day_statuses")
@@ -171,8 +173,8 @@ model LeaveBalance {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  user        User        @relation(fields: [userId], references: [id])
-  leavePolicy LeavePolicy @relation(fields: [leavePolicyId], references: [id])
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  leavePolicy LeavePolicy @relation("LeavePolicyToBalances", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
 
   @@unique([userId, leavePolicyId, year])
   @@map("leave_balances")
@@ -219,7 +221,7 @@ model Notification {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
 
   @@map("notifications")
 }
@@ -237,7 +239,7 @@ model AuditLog {
   timestamp  DateTime    @default(now())
 
   // Relations
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
 
   @@map("audit_logs")
 }

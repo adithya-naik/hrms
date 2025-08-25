@@ -93,7 +93,7 @@ const App = () => (
                   </ProtectedRoute>
                 }
               />
-              {/* notifications */} <Route path="notifications" element={<ProtectedRoute roles={['EMPLOYEE', 'MANAGER', 'HR', 'ADMIN']}> <NotificationsPage /> </ProtectedRoute>} />
+              {/* notifications */} <Route path="notifications" element={<ProtectedRoute roles={['EMPLOYEE', 'MANAGER', 'HR']}> <NotificationsPage /> </ProtectedRoute>} />
               {/* Reports */}
               <Route
                 path="reports"
