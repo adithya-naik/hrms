@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import { toast } from '@/components/ui/sonner'
+import { toast } from "sonner" // ✅ use global sonner instead of "@/components/ui/sonner"
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
 } from '@/components/ui/card'
@@ -42,6 +42,8 @@ type LeaveType = {
   reason?: string
   requester: UserType
   dayStatuses?: LeaveDayStatus[]
+  isLOP?: boolean
+  rejectionReason?: string
 }
 
 export default function TeamLeaves() {
@@ -80,7 +82,11 @@ export default function TeamLeaves() {
     }
   }
 
-  const formatLeaveType = (type: string) => type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+  const formatLeaveType = (type: string, isLOP?: boolean) => {
+    const formatted = type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())
+    return isLOP ? `${formatted} (LOP)` : formatted
+  }
+
   const canApproveReject = (leave: LeaveType) => leave.status === 'PENDING'
 
   const handleApproveLeave = async (leaveId: string) => {
@@ -98,6 +104,7 @@ export default function TeamLeaves() {
       await rejectLeave({ id: leaveId, rejectionReason }).unwrap()
       toast.success('Leave request rejected')
       setRejectionReason('')
+      setSelectedLeaveId(null)
     } catch (err: any) {
       toast.error(err?.data?.message || 'Failed to reject leave request')
     }
@@ -172,7 +179,7 @@ export default function TeamLeaves() {
                         <div className="text-sm text-muted-foreground">{leave.requester.employeeId}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{formatLeaveType(leave.leaveType)}</TableCell>
+                    <TableCell>{formatLeaveType(leave.leaveType, leave.isLOP)}</TableCell>
                     <TableCell>{format(new Date(leave.startDate), 'MMM dd, yyyy')} - {format(new Date(leave.endDate), 'MMM dd, yyyy')}</TableCell>
                     <TableCell>{leave.totalDays}</TableCell>
                     <TableCell>{format(new Date(leave.appliedDate), 'MMM dd, yyyy')}</TableCell>
@@ -203,10 +210,10 @@ export default function TeamLeaves() {
                             <DialogHeader>
                               <DialogTitle>Leave Request Details</DialogTitle>
                             </DialogHeader>
-                            {selectedLeave && (
+                            {selectedLeave && selectedLeave.id === leave.id && (
                               <div className="space-y-4">
                                 <div><strong>Employee:</strong> {selectedLeave.requester.firstName} {selectedLeave.requester.lastName}</div>
-                                <div><strong>Leave Type:</strong> {formatLeaveType(selectedLeave.leaveType)}</div>
+                                <div><strong>Leave Type:</strong> {formatLeaveType(selectedLeave.leaveType, selectedLeave.isLOP)}</div>
                                 <div><strong>Duration:</strong> {format(new Date(selectedLeave.startDate), 'MMM dd, yyyy')} - {format(new Date(selectedLeave.endDate), 'MMM dd, yyyy')}</div>
                                 <div><strong>Reason:</strong> {selectedLeave.reason}</div>
 
@@ -225,6 +232,10 @@ export default function TeamLeaves() {
                                   </div>
                                 )}
 
+                                {selectedLeave.rejectionReason && (
+                                  <p className="text-red-600"><strong>Rejection Reason:</strong> {selectedLeave.rejectionReason}</p>
+                                )}
+
                                 {canApproveReject(selectedLeave) && (
                                   <div className="flex gap-2 pt-4 border-t">
                                     <Button onClick={() => handleApproveLeave(selectedLeave.id)} className="flex-1">
@@ -233,7 +244,7 @@ export default function TeamLeaves() {
 
                                     {/* Day-wise Reject */}
                                     {selectedLeave.dayStatuses && selectedLeave.dayStatuses.length > 0 && (
-                                      <Dialog open={!!selectedLeave} onOpenChange={(open) => { if (!open) setSelectedLeaveId(null) }}>
+                                      <Dialog>
                                         <DialogTrigger asChild>
                                           <Button variant="destructive" className="flex-1">
                                             <X className="h-4 w-4 mr-2" />Reject Days

@@ -20,7 +20,7 @@ export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
   };
 
   const formatLeaveType = (type: string) => {
-    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    return type.replace('_', ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
   return (
@@ -31,7 +31,7 @@ export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
         const available = balance.availableDays;
         const percentageAvailable = Math.round((available / total) * 100);
 
-        const radius = 28; // smaller radius
+        const radius = 28;
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (percentageAvailable / 100) * circumference;
 
@@ -43,9 +43,8 @@ export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
                 {formatLeaveType(balance.leavePolicy?.leaveType || balance.leaveType)}
               </CardTitle>
             </CardHeader>
-            
+
             <CardContent className="flex flex-col items-center">
-              {/* Smaller Circular Progress */}
               <div className="relative w-16 h-16">
                 <svg className="w-full h-full transform -rotate-90">
                   <circle
@@ -78,7 +77,6 @@ export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
                 </div>
               </div>
 
-              {/* Details */}
               <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5 text-center">
                 <div>Used: {used}</div>
                 <div>Pending: {balance.pendingDays}</div>

@@ -1,67 +1,75 @@
-import { Router } from 'express';
-import { leaveController, upload } from '../controllers/leaveController';
-import { authMiddleware, authorize } from '../middleware/auth';
-import { UserRole } from '@prisma/client';
+// src/routes/leaveRoutes.ts
+import { Router } from "express";
+import { leaveController, upload } from "../controllers/leaveController";
+import { authMiddleware, authorize } from "../middleware/auth";
+import { UserRole } from "@prisma/client";
 
 const router = Router();
 
-// All routes require authentication
+// 🔒 All routes require authentication
 router.use(authMiddleware);
 
-// Employee routes
-router.get('/', leaveController.getLeaves);
-router.post('/', upload.array('attachments'), leaveController.createLeave);
-router.get('/balances', leaveController.getLeaveBalances);
+// ---------------- Employee Routes ----------------
+router.get("/", leaveController.getLeaves);
+router.post("/", upload.array("attachments"), leaveController.createLeave);
+router.get("/balances", leaveController.getLeaveBalances);
+
 router.put(
-  '/:id/cancel',
+  "/:id/cancel",
   authorize([UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.HR]), // exclude ADMIN
   leaveController.cancelLeave
 );
 
-// PATCH /:id/day-status with proper authorization
+// ---------------- Day-wise Updates ----------------
 router.patch(
-  '/:id/day-status',
+  "/:id/day-status",
   authorize([UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
   leaveController.updateDayStatuses
 );
 
-
-// Manager/HR routes
+// ---------------- Manager / HR Routes ----------------
 router.put(
-  '/:id/approve',
+  "/:id/approve",
   authorize([UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
   leaveController.approveLeave
 );
 router.put(
-  '/:id/reject',
+  "/:id/reject",
   authorize([UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
   leaveController.rejectLeave
 );
 router.get(
-  '/team',
+  "/team",
   authorize([UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
   leaveController.getTeamLeaves
 );
 
-
-// Admin/HR routes
+// Get logged-in user's leave dates (calendar use)
 router.get(
-  '/policies',
-  authorize([UserRole.HR, UserRole.EMPLOYEE, UserRole.ADMIN]),
+  "/my-dates",
+  authorize([UserRole.EMPLOYEE, UserRole.MANAGER, UserRole.HR, UserRole.ADMIN]),
+  leaveController.getMyLeaveDates
+);
+
+
+// ---------------- Admin / HR Routes ----------------
+router.get(
+  "/policies",
+  authorize([UserRole.HR, UserRole.EMPLOYEE, UserRole.MANAGER,UserRole.ADMIN]),
   leaveController.getLeavePolicies
 );
 router.post(
-  '/policies',
+  "/policies",
   authorize([UserRole.ADMIN]),
   leaveController.createLeavePolicy
 );
 router.put(
-  '/policies/:id',
+  "/policies/:id",
   authorize([UserRole.ADMIN]),
   leaveController.updateLeavePolicy
 );
 router.delete(
-  '/policies/:id',
+  "/policies/:id",
   authorize([UserRole.ADMIN]),
   leaveController.deleteLeavePolicy
 );

@@ -31,10 +31,8 @@ async function main() {
   // ---------------- STEP 2: Leave Policies ----------------
   const policiesData = [
     { leaveType: LeaveType.SICK, annualQuota: 12, maxConsecutiveDays: 5, minDaysNotice: 0, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
-    { leaveType: LeaveType.CASUAL, annualQuota: 15, maxConsecutiveDays: 3, minDaysNotice: 1, requiresApproval: true, requiresDocument: false, carryForwardAllowed: true, maxCarryForward: 4 },
     { leaveType: LeaveType.VACATION, annualQuota: 20, maxConsecutiveDays: 10, minDaysNotice: 7, requiresApproval: true, requiresDocument: false, carryForwardAllowed: true, maxCarryForward: 10 },
-    { leaveType: LeaveType.ACADEMIC, annualQuota: 5, maxConsecutiveDays: 2, minDaysNotice: 3, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
-    { leaveType: LeaveType.COMP_OFF, annualQuota: 12, maxConsecutiveDays: 2, minDaysNotice: 1, requiresApproval: true, requiresDocument: false, carryForwardAllowed: true, maxCarryForward: 16 },
+    { leaveType: LeaveType.LOP, annualQuota: 5, maxConsecutiveDays: 2, minDaysNotice: 3, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
     { leaveType: LeaveType.WFH, annualQuota: 50, maxConsecutiveDays: 5, minDaysNotice: 1, requiresApproval: true, requiresDocument: false, carryForwardAllowed: false },
   ];
 

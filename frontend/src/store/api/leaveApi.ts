@@ -5,7 +5,7 @@ import { RootState } from "../index";
 // ---------------- Types ----------------
 export interface DayStatus {
   date: string; // 'YYYY-MM-DD'
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'PARTIAL';
+  status: "PENDING" | "APPROVED" | "REJECTED" | "PARTIAL";
   rejectedReason?: string;
 }
 
@@ -16,7 +16,7 @@ export interface Leave {
   endDate: string;
   totalDays: number;
   status: string;
-  dayStatuses?: DayStatus[];
+  dayStatuses?: DayStatus[]; // ✅ this is what we’ll use in calendar
   requester?: {
     id: string;
     firstName: string;
@@ -84,12 +84,12 @@ export const leaveApi = createApi({
       providesTags: ["Leave"],
     }),
 
+    // ✅ create leave with file uploads
     createLeave: builder.mutation<any, FormData>({
       query: (formData) => ({
         url: "",
         method: "POST",
-    body: formData, // FormData will include files and other fields
-    // IMPORTANT: Do NOT set headers manually — fetchBaseQuery will set multipart/form-data automatically
+        body: formData,
       }),
       invalidatesTags: ["Leave", "LeaveBalance"],
     }),
@@ -138,10 +138,23 @@ export const leaveApi = createApi({
       providesTags: ["TeamLeave"],
     }),
 
-    // ---- Day-wise Leave Update ----
-    dayWiseUpdateLeave: builder.mutation<Leave, { id: string; dayStatuses: DayStatus[] }>({
-      query: ({ id, dayStatuses }) => ({ url: `/${id}/day-status`, method: "PATCH", body: { dayStatuses } }),
+    // ✅ Day-wise Leave Update (for partial approval/rejection)
+    dayWiseUpdateLeave: builder.mutation<
+      Leave,
+      { id: string; dayStatuses: DayStatus[] }
+    >({
+      query: ({ id, dayStatuses }) => ({
+        url: `/${id}/day-status`,
+        method: "PATCH",
+        body: { dayStatuses },
+      }),
       invalidatesTags: ["Leave", "TeamLeave", "LeaveBalance"],
+    }),
+
+    // ✅ NEW ENDPOINT: fetch only day-wise leave statuses of logged-in user
+    getMyLeaveDates: builder.query<DayStatus[], void>({
+      query: () => "/my-dates", // backend should return [{date, status}]
+      providesTags: ["Leave"],
     }),
 
     // ---- Leave Policy Endpoints ----
@@ -209,6 +222,9 @@ export const {
 
   // ✅ Day-wise leave update
   useDayWiseUpdateLeaveMutation,
+
+  // ✅ New hook for day-wise dates (for calendar disable + highlight)
+  useGetMyLeaveDatesQuery,
 
   // Policies
   useGetLeavePoliciesQuery,
