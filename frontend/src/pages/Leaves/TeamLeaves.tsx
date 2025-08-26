@@ -2,22 +2,26 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import { toast } from "sonner" // ✅ use global sonner instead of "@/components/ui/sonner"
+import { toast } from "sonner"
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Textarea } from "@/components/ui/textarea";
+import { Textarea } from "@/components/ui/textarea"
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
-import { FileText, Eye, Check, X, Search, Filter } from 'lucide-react'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { FileText, Eye, Check, X, Search, Filter, Calendar } from 'lucide-react'
 
 import { useGetTeamLeavesQuery, useApproveLeaveMutation, useRejectLeaveMutation } from '@/store/api/leaveApi'
 import DayWiseReject from '@/components/DayWiseReject'
+import DayWiseApproval from '@/components/DayWiseApproval'
 
 type UserType = {
   firstName: string
@@ -55,7 +59,7 @@ export default function TeamLeaves() {
 
   const filterStatus = status === 'all' ? undefined : status
 
-  const { data: leavesData, isLoading } = useGetTeamLeavesQuery({
+  const { data: leavesData, isLoading, refetch } = useGetTeamLeavesQuery({
     page,
     limit: 10,
     status: filterStatus,
@@ -78,6 +82,7 @@ export default function TeamLeaves() {
       case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
       case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200'
       case 'CANCELLED': return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'PARTIAL': return 'bg-orange-100 text-orange-800 border-orange-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
@@ -93,6 +98,7 @@ export default function TeamLeaves() {
     try {
       await approveLeave(leaveId).unwrap()
       toast.success('Leave request approved successfully')
+      refetch()
     } catch (err: any) {
       toast.error(err?.data?.message || 'Failed to approve leave request')
     }
@@ -105,9 +111,14 @@ export default function TeamLeaves() {
       toast.success('Leave request rejected')
       setRejectionReason('')
       setSelectedLeaveId(null)
+      refetch()
     } catch (err: any) {
       toast.error(err?.data?.message || 'Failed to reject leave request')
     }
+  }
+
+  const handleDayWiseUpdate = () => {
+    refetch()
   }
 
   if (isLoading) return (
@@ -151,6 +162,7 @@ export default function TeamLeaves() {
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                <SelectItem value="PARTIAL">Partial</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -242,8 +254,7 @@ export default function TeamLeaves() {
                                       <Check className="h-4 w-4 mr-2" />Approve
                                     </Button>
 
-                                    {/* Day-wise Reject */}
-                                    {selectedLeave.dayStatuses && selectedLeave.dayStatuses.length > 0 && (
+                                    {selectedLeave.dayStatuses && selectedLeave.dayStatuses.length > 0 ? (
                                       <Dialog>
                                         <DialogTrigger asChild>
                                           <Button variant="destructive" className="flex-1">
@@ -251,13 +262,10 @@ export default function TeamLeaves() {
                                           </Button>
                                         </DialogTrigger>
                                         <DialogContent className="max-w-lg">
-                                          <DayWiseReject leave={selectedLeave} onClose={() => setSelectedLeaveId(null)} />
+                                          <DayWiseReject leave={selectedLeave} onUpdate={handleDayWiseUpdate} />
                                         </DialogContent>
                                       </Dialog>
-                                    )}
-
-                                    {/* Normal Reject */}
-                                    {!selectedLeave.dayStatuses && (
+                                    ) : (
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <Button variant="destructive" className="flex-1">
@@ -285,6 +293,23 @@ export default function TeamLeaves() {
                             )}
                           </DialogContent>
                         </Dialog>
+
+                        {/* Day-wise Calendar Modal */}
+                        {canApproveReject(leave) && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" title="Day-wise Approval">
+                                <Calendar className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+                              <DialogHeader>
+                                <DialogTitle>Day-wise Approval - {leave.requester.firstName} {leave.requester.lastName}</DialogTitle>
+                              </DialogHeader>
+                              <DayWiseApproval leave={leave} onUpdate={handleDayWiseUpdate} />
+                            </DialogContent>
+                          </Dialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
