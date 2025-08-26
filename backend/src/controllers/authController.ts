@@ -129,7 +129,8 @@ async getProfile(req: AuthRequest, res: Response) {
           id: true, 
           firstName: true, 
           lastName: true, 
-          email: true 
+          email: true,
+          profileImage: true 
         } 
       },
       hr: {  // 👈 Include HR details
@@ -137,7 +138,8 @@ async getProfile(req: AuthRequest, res: Response) {
           id: true, 
           firstName: true, 
           lastName: true, 
-          email: true 
+          email: true,
+          profileImage: true 
         }
       },
       leaveBalances: { 
@@ -198,7 +200,7 @@ async getProfile(req: AuthRequest, res: Response) {
         where: { id: decoded.userId },
         include: {
           department: true,
-          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+          manager: { select: { id: true, firstName: true, lastName: true, email: true, profileImage: true } },
         },
       });
 

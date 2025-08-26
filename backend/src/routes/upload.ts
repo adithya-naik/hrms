@@ -36,6 +36,9 @@ router.post(
   uploadController.uploadProfilePicture
 );
 
+// Delete profile picture
+router.delete('/profile-picture', uploadController.deleteProfilePicture);
+
 // Delete by publicId
 router.delete('/document/:publicId', uploadController.deleteDocument);
 

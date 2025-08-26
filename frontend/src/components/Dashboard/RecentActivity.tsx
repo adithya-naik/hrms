@@ -11,6 +11,7 @@ import { Calendar, Clock, User, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useGetProfileQuery } from '@/store/api/authApi';
+import { UserAvatar } from '@/components/UserAvatar';
 
 interface RecentActivityProps {
   recentLeaves: any[];
@@ -88,7 +89,11 @@ export function RecentActivity({ recentLeaves, upcomingLeaves }: RecentActivityP
                   <div className="flex-1">
                     {userRole !== 'EMPLOYEE' && leave.requester && (
                       <div className="flex items-center gap-2 mb-1">
-                        <User className="h-3 w-3 text-muted-foreground" />
+                        <UserAvatar 
+                          user={leave.requester} 
+                          size="sm" 
+                          className="h-5 w-5" 
+                        />
                         <span className="text-sm font-medium">
                           {leave.requester.firstName} {leave.requester.lastName}
                         </span>
@@ -152,7 +157,11 @@ export function RecentActivity({ recentLeaves, upcomingLeaves }: RecentActivityP
                   <div className="flex-1">
                     {userRole !== 'EMPLOYEE' && leave.requester && (
                       <div className="flex items-center gap-2 mb-1">
-                        <User className="h-3 w-3 text-muted-foreground" />
+                        <UserAvatar 
+                          user={leave.requester} 
+                          size="sm" 
+                          className="h-5 w-5" 
+                        />
                         <span className="text-sm font-medium">
                           {leave.requester.firstName} {leave.requester.lastName}
                         </span>

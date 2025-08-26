@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Search, Plus, Edit, Trash2, UserPlus } from 'lucide-react';
+import { UserAvatar } from '@/components/UserAvatar';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -431,12 +432,15 @@ export default function Users() {
               {users.map((user: any) => (
                 <TableRow key={user.id}>
                   <TableCell>
-                    <div>
-                      <div className="font-medium">
-                        {user.firstName} {user.lastName}
+                    <div className="flex items-center space-x-3">
+                      <UserAvatar user={user} size="lg" />
+                      <div>
+                        <div className="font-medium">
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className="text-xs text-muted-foreground">{user.employeeId}</div>
                       </div>
-                      <div className="text-sm text-muted-foreground">{user.email}</div>
-                      <div className="text-xs text-muted-foreground">{user.employeeId}</div>
                     </div>
                   </TableCell>
 

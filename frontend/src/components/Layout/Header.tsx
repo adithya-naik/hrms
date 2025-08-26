@@ -1,4 +1,5 @@
 import { Bell, Search } from "lucide-react";
+import { UserAvatar } from "@/components/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,6 +49,11 @@ const unreadCount = notifications.filter((n) => !n.isRead).length;
               <Input placeholder="Search..." className="pl-8" />
             </div>
           </div>
+
+          {/* User Avatar */}
+          {user && (
+            <UserAvatar user={user} size="md" className="mr-2" />
+          )}
 
           {/* 🔔 Notifications */}
           <DropdownMenu>

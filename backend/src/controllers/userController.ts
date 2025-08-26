@@ -65,7 +65,7 @@ export const userController = {
       const users = await prisma.user.findMany({
         include: {
           department: true,
-          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+          manager: { select: { id: true, firstName: true, lastName: true, email: true, profileImage: true } },
         },
       });
       return res.json(users);
@@ -81,7 +81,7 @@ export const userController = {
         where: { id },
         include: {
           department: true,
-          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
+          manager: { select: { id: true, firstName: true, lastName: true, email: true, profileImage: true } },
           leaveBalances: { where: { year: new Date().getFullYear() }, include: { leavePolicy: true } },
         },
       });

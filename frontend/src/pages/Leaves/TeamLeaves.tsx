@@ -18,6 +18,7 @@ import { FileText, Eye, Check, X, Search, Filter } from 'lucide-react'
 
 import { useGetTeamLeavesQuery, useApproveLeaveMutation, useRejectLeaveMutation } from '@/store/api/leaveApi'
 import DayWiseReject from '@/components/DayWiseReject'
+import { UserAvatar } from '@/components/UserAvatar'
 
 type UserType = {
   firstName: string
@@ -174,9 +175,16 @@ export default function TeamLeaves() {
                 {leaves.map((leave) => (
                   <TableRow key={leave.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{leave.requester.firstName} {leave.requester.lastName}</div>
-                        <div className="text-sm text-muted-foreground">{leave.requester.employeeId}</div>
+                      <div className="flex items-center gap-3">
+                        <UserAvatar 
+                          user={leave.requester} 
+                          size="sm" 
+                          className="h-8 w-8" 
+                        />
+                        <div>
+                          <div className="font-medium">{leave.requester.firstName} {leave.requester.lastName}</div>
+                          <div className="text-sm text-muted-foreground">{leave.requester.employeeId}</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>{formatLeaveType(leave.leaveType, leave.isLOP)}</TableCell>

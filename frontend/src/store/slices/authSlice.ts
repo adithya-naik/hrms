@@ -27,7 +27,7 @@ const initialState: AuthState = {
   token: localStorage.getItem('auth_token'),
   refreshToken: localStorage.getItem('refresh_token'),
   isAuthenticated: !!localStorage.getItem('auth_token'),
-  isLoading: false,
+  isLoading: !!localStorage.getItem('auth_token'), // Start loading if we have a token but no user
 };
 
 const authSlice = createSlice({
@@ -38,6 +38,7 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.token = action.payload.token;
       state.isAuthenticated = true;
+      state.isLoading = false; // Stop loading once we have user data
       localStorage.setItem('auth_token', action.payload.token);
 
       if (action.payload.refreshToken) {

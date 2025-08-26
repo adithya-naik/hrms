@@ -5,9 +5,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Briefcase, Mail, User as UserIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+import { ProfileImageManager } from "@/components/ProfileImageManager";
 
 export default function ProfilePage() {
-const { data, isLoading, isError } = useGetProfileQuery(undefined, {
+const { data, isLoading, isError, refetch } = useGetProfileQuery(undefined, {
   refetchOnMountOrArgChange: true,
 });
 
@@ -42,20 +43,18 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
     <div className="p-6 space-y-6">
       {/* Profile Header */}
       <Card className="p-6 flex flex-col md:flex-row items-center md:items-start gap-6 shadow-lg">
-        <Avatar className="h-24 w-24">
-          {user.profileImage ? (
-            <AvatarImage src={user.profileImage} alt={`${user.firstName} ${user.lastName}`} />
-          ) : (
-            <AvatarFallback>{initials || "U"}</AvatarFallback>
-          )}
-        </Avatar>
+        <ProfileImageManager 
+          user={user} 
+          onImageUpdate={() => refetch()}
+          size="xl"
+        />
 
         <div className="flex-1 space-y-3">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold">
               {user.firstName} {user.lastName}
             </h2>
-            <Badge variant={user.isActive ? "success" : "destructive"}>
+            <Badge variant={user.isActive ? "default" : "destructive"}>
               {user.isActive ? "Active" : "Inactive"}
             </Badge>
           </div>

@@ -20,6 +20,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { UserAvatar } from "@/components/UserAvatar";
 
 const navigation = [
   { name: "Dashboard", href: "/app", icon: LayoutDashboard, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
@@ -119,16 +120,11 @@ export function Sidebar() {
             to="/app/me"
             className="flex items-center gap-3 mb-4 hover:bg-muted p-2 rounded-lg transition"
           >
-            <div className="flex-shrink-0 rounded-full bg-primary w-9 h-9 flex items-center justify-center text-primary-foreground font-bold">
-              {user?.firstName ? (
-                <>
-                  {user.firstName[0]}
-                  {user?.lastName?.[0]}
-                </>
-              ) : (
-                <User className="w-5 h-5" />
-              )}
-            </div>
+            <UserAvatar 
+              user={user} 
+              size="md" 
+              className="w-9 h-9" 
+            />
             <div className="min-w-0">
               <p className="font-semibold truncate">
                 {user?.firstName} {user?.lastName}
