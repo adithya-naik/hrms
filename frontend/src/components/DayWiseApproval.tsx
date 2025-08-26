@@ -1,23 +1,23 @@
-// src/components/DayWiseReject.tsx
+// src/components/DayWiseApproval.tsx
 "use client"
 
 import { useState } from 'react'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { toast } from "sonner"
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { X } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { useDayWiseUpdateLeaveMutation } from '@/store/api/leaveApi'
 
-interface DayWiseRejectProps {
+interface DayWiseApprovalProps {
   leave: any // Use your LeaveType here
   onUpdate?: () => void
 }
 
-// Move getDateRange function outside the component to avoid hoisting issues
+// Move getDateRange function outside the component or declare it before useState
 const getDateRange = (startDate: string, endDate: string) => {
   const dates = []
   const start = new Date(startDate)
@@ -29,9 +29,9 @@ const getDateRange = (startDate: string, endDate: string) => {
   return dates
 }
 
-export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
+export default function DayWiseApproval({ leave, onUpdate }: DayWiseApprovalProps) {
   const [dayStatuses, setDayStatuses] = useState(() => {
-    // Initialize day statuses from existing data or create new ones
+    // Now getDateRange is available
     const dateRange = getDateRange(leave.startDate, leave.endDate)
     return dateRange.map(date => {
       const existing = leave.dayStatuses?.find((ds: any) => 
@@ -53,8 +53,16 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
 
   const [dayWiseUpdate] = useDayWiseUpdateLeaveMutation()
 
-  const handleDayReject = (date: string) => {
-    setRejectDialog({ show: true, date, reason: '' })
+  const handleDayAction = (date: string, action: 'APPROVED' | 'REJECTED') => {
+    if (action === 'REJECTED') {
+      setRejectDialog({ show: true, date, reason: '' })
+    } else {
+      setDayStatuses(prev => prev.map(day => 
+        day.date === date 
+          ? { ...day, status: 'APPROVED', rejectedReason: '' }
+          : day
+      ))
+    }
   }
 
   const handleRejectConfirm = () => {
@@ -82,7 +90,7 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
         dayStatuses: formattedDayStatuses
       }).unwrap()
 
-      toast.success('Day-wise rejection updated successfully')
+      toast.success('Day-wise status updated successfully')
       onUpdate?.()
     } catch (error: any) {
       toast.error(error?.data?.message || 'Failed to update day-wise status')
@@ -101,12 +109,12 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
     <div className="space-y-4">
       {/* Leave Info */}
       <div className="p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-semibold mb-2">Reject Leave Days</h3>
+        <h3 className="font-semibold mb-2">Leave Details</h3>
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div><strong>Employee:</strong> {leave.requester?.firstName} {leave.requester?.lastName}</div>
           <div><strong>Type:</strong> {leave.leaveType}</div>
           <div><strong>Duration:</strong> {format(new Date(leave.startDate), 'MMM dd')} - {format(new Date(leave.endDate), 'MMM dd, yyyy')}</div>
           <div><strong>Total Days:</strong> {leave.totalDays}</div>
+          <div><strong>Reason:</strong> {leave.reason}</div>
         </div>
       </div>
 
@@ -117,7 +125,8 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
             <TableRow className="bg-gray-50">
               <TableHead>Date</TableHead>
               <TableHead>Day</TableHead>
-              <TableHead className="text-center">Action</TableHead>
+              <TableHead className="text-center">Approve</TableHead>
+              <TableHead className="text-center">Reject</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -135,13 +144,23 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
                   </TableCell>
                   <TableCell className="text-center">
                     <Button
+                      variant={day.status === 'APPROVED' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => handleDayAction(day.date, 'APPROVED')}
+                      disabled={day.status === 'APPROVED'}
+                      className={day.status === 'APPROVED' ? 'bg-green-600 hover:bg-green-700' : ''}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
                       variant={day.status === 'REJECTED' ? 'destructive' : 'outline'}
                       size="sm"
-                      onClick={() => handleDayReject(day.date)}
+                      onClick={() => handleDayAction(day.date, 'REJECTED')}
                       disabled={day.status === 'REJECTED'}
                     >
                       <X className="h-4 w-4" />
-                      {day.status === 'REJECTED' ? 'Rejected' : 'Reject'}
                     </Button>
                   </TableCell>
                   <TableCell>
@@ -167,7 +186,7 @@ export default function DayWiseReject({ leave, onUpdate }: DayWiseRejectProps) {
       {/* Save Button */}
       <div className="flex justify-end pt-4 border-t">
         <Button onClick={handleSave} className="px-6">
-          Save Rejections
+          Save Changes
         </Button>
       </div>
 

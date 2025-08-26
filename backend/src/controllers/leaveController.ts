@@ -10,7 +10,6 @@ import multer from "multer"
 import path from "path"
 import { safeDate } from "../utils/date"
 import { format } from "date-fns"
-
 // Utility: Add days to a Date object
 function addDays(date: Date, days: number) {
   const result = new Date(date)
@@ -654,45 +653,182 @@ class LeaveController {
   }
 
   async updateDayStatuses(req: AuthRequest, res: Response) {
-    const { id } = req.params
-    const { dayStatuses } = req.body as {
-      dayStatuses: { date: string; status: LeaveStatus; rejectedReason?: string }[]
+  const { id } = req.params
+  const { dayStatuses } = req.body as {
+    dayStatuses: { date: string; status: LeaveStatus; rejectedReason?: string }[]
+  }
+
+  const leave = await prisma.leave.findUnique({
+    where: { id },
+    include: { 
+      requester: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          managerId: true,
+        },
+      },
+    },
+  })
+
+  if (!leave) throw createError("Leave request not found", 404)
+
+  if (req.user!.role === UserRole.MANAGER && leave.requester.managerId !== req.user!.id) {
+    throw createError("You can only update leaves for your team members", 403)
+  }
+
+  await Promise.all(
+    dayStatuses.map((d) =>
+      prisma.leaveDayStatus.upsert({
+        where: { leaveId_date: { leaveId: id, date: new Date(d.date) } },
+        update: { status: d.status, reason: d.rejectedReason },
+        create: { leaveId: id, date: new Date(d.date), status: d.status, reason: d.rejectedReason },
+      }),
+    ),
+  )
+
+  const updatedDays = await prisma.leaveDayStatus.findMany({ where: { leaveId: id } })
+
+  // Determine the overall leave status
+  let newOverallStatus = leave.status
+  if (updatedDays.every((d) => d.status === LeaveStatus.REJECTED)) {
+    newOverallStatus = LeaveStatus.REJECTED
+  } else if (updatedDays.every((d) => d.status === LeaveStatus.APPROVED)) {
+    newOverallStatus = LeaveStatus.APPROVED
+  } else if (updatedDays.some((d) => d.status === LeaveStatus.APPROVED)) {
+    newOverallStatus = LeaveStatus.PARTIAL
+  }
+
+  // Update main leave status
+  const updatedLeave = await prisma.leave.update({ 
+    where: { id }, 
+    data: { 
+      status: newOverallStatus,
+      approverId: req.user!.id,
+      approvedDate: newOverallStatus === LeaveStatus.APPROVED ? new Date() : null,
     }
+  })
 
-    const leave = await prisma.leave.findUnique({
-      where: { id },
-      include: { requester: true },
-    })
+  // Send email notifications based on the new status
+  const company = await this.getCompanyInfo()
+  const emailData = {
+    requesterName: `${leave.requester.firstName} ${leave.requester.lastName}`,
+    leaveType: leave.leaveType,
+    startDate: leave.startDate,
+    endDate: leave.endDate,
+    totalDays: leave.totalDays,
+  }
 
-    if (!leave) throw createError("Leave request not found", 404)
-
-    if (req.user!.role === UserRole.MANAGER && leave.requester.managerId !== req.user!.id) {
-      throw createError("You can only update leaves for your team members", 403)
-    }
-
-    await Promise.all(
-      dayStatuses.map((d) =>
-        prisma.leaveDayStatus.upsert({
-          where: { leaveId_date: { leaveId: id, date: new Date(d.date) } },
-          update: { status: d.status, reason: d.rejectedReason },
-          create: { leaveId: id, date: new Date(d.date), status: d.status, reason: d.rejectedReason },
-        }),
-      ),
+  // Send appropriate email based on overall status
+  if (newOverallStatus === LeaveStatus.APPROVED) {
+    // All days approved
+    const template = emailTemplates.leaveApproved(company, emailData)
+    const ok = await this.sendEmailAndLog({ to: leave.requester.email, ...template }, "leaveApproved")
+    
+    await this.sendAppNotification(
+      leave.requesterId,
+      "Leave Approved",
+      `Your ${leave.leaveType} leave (${leave.totalDays} day${leave.totalDays === 1 ? "" : "s"}) was approved${leave.isLOP ? " (includes LOP)" : ""}.`,
+      ok ? "success" : "info",
+      leave.id,
     )
 
-    const updatedDays = await prisma.leaveDayStatus.findMany({ where: { leaveId: id } })
+    // Update leave balances when fully approved
+    await prisma.$transaction(async (tx) => {
+      await this.updateLeaveBalanceOnApproval(
+        tx,
+        leave.requesterId,
+        leave.leaveType,
+        leave.totalDays,
+        leave.startDate.getFullYear(),
+      )
+    })
 
-    // Update main leave status based on day statuses
-    if (updatedDays.every((d) => d.status === LeaveStatus.REJECTED)) {
-      await prisma.leave.update({ where: { id }, data: { status: LeaveStatus.REJECTED } })
-    } else if (updatedDays.every((d) => d.status === LeaveStatus.APPROVED)) {
-      await prisma.leave.update({ where: { id }, data: { status: LeaveStatus.APPROVED } })
-    } else if (updatedDays.some((d) => d.status === LeaveStatus.APPROVED)) {
-      await prisma.leave.update({ where: { id }, data: { status: LeaveStatus.PARTIAL } })
+  } else if (newOverallStatus === LeaveStatus.REJECTED) {
+    // All days rejected - get rejection reasons
+    const rejectedDays = updatedDays.filter(d => d.status === LeaveStatus.REJECTED)
+    const rejectionReasons = rejectedDays
+      .map(d => d.reason)
+      .filter(r => r && r.trim())
+      .join(', ') || "Not specified"
+
+    const template = emailTemplates.leaveRejected(company, { ...emailData, reason: rejectionReasons })
+    const ok = await this.sendEmailAndLog({ to: leave.requester.email, ...template }, "leaveRejected")
+    
+    await this.sendAppNotification(
+      leave.requesterId,
+      "Leave Rejected",
+      `Your ${leave.leaveType} leave was rejected.${rejectionReasons !== "Not specified" ? ` Reason: ${rejectionReasons}` : ""}`,
+      ok ? "error" : "info",
+      leave.id,
+    )
+
+  } else if (newOverallStatus === LeaveStatus.PARTIAL) {
+    // Partial approval - send custom email
+    const approvedDays = updatedDays.filter(d => d.status === LeaveStatus.APPROVED)
+    const rejectedDays = updatedDays.filter(d => d.status === LeaveStatus.REJECTED)
+    
+    const approvedDates = approvedDays.map(d => format(new Date(d.date), "MMM dd, yyyy")).join(", ")
+    const rejectedDates = rejectedDays.map(d => format(new Date(d.date), "MMM dd, yyyy")).join(", ")
+    
+    const rejectionReasons = rejectedDays
+      .map(d => d.reason)
+      .filter(r => r && r.trim())
+      .join(', ') || "Not specified"
+
+    // Create custom partial approval email
+    const partialTemplate = {
+      subject: `Partial Approval: ${leave.leaveType} Leave Request`,
+      html: `
+        <div style="font-family: Inter, -apple-system, Segoe UI, Roboto, Arial; background:#f6f7fb; padding:24px;">
+          <div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #eee; padding: 20px;">
+            <h2 style="margin:0 0 16px 0; color: #f59e0b;">Partial Leave Approval</h2>
+            <p>Dear <strong>${emailData.requesterName}</strong>,</p>
+            <p>Your ${leave.leaveType} leave request has been <strong>partially approved</strong>.</p>
+            
+            <div style="margin: 16px 0;">
+              <h3 style="color: #10b981; margin: 8px 0;">Approved Days:</h3>
+              <p style="margin: 4px 0; padding: 8px; background: #d1fae5; border-radius: 4px;">${approvedDates}</p>
+            </div>
+            
+            <div style="margin: 16px 0;">
+              <h3 style="color: #ef4444; margin: 8px 0;">Rejected Days:</h3>
+              <p style="margin: 4px 0; padding: 8px; background: #fee2e2; border-radius: 4px;">${rejectedDates}</p>
+              ${rejectionReasons !== "Not specified" ? `<p><strong>Reason for rejection:</strong> ${rejectionReasons}</p>` : ""}
+            </div>
+            
+            <p>If you have any questions, please contact your manager or HR.</p>
+          </div>
+        </div>
+      `
     }
+    
+    const ok = await this.sendEmailAndLog({ to: leave.requester.email, ...partialTemplate }, "leaveRequest")
+    
+    await this.sendAppNotification(
+      leave.requesterId,
+      "Leave Partially Approved",
+      `Your ${leave.leaveType} leave was partially approved. ${approvedDays.length} day(s) approved, ${rejectedDays.length} day(s) rejected.`,
+      ok ? "info" : "error",
+      leave.id,
+    )
 
-    res.json({ success: true, dayStatuses: updatedDays })
+    // Update leave balances for approved days only
+    await prisma.$transaction(async (tx) => {
+      await this.updateLeaveBalanceOnApproval(
+        tx,
+        leave.requesterId,
+        leave.leaveType,
+        approvedDays.length,
+        leave.startDate.getFullYear(),
+      )
+    })
   }
+
+  res.json({ success: true, dayStatuses: updatedDays, overallStatus: newOverallStatus })
+}
 
   private async calculateLeaveDistribution(
     userId: string,
@@ -930,22 +1066,29 @@ class LeaveController {
   }
 
   private async sendAppNotification(
-    userId: string,
-    title: string,
-    message: string,
-    type: "info" | "success" | "error" = "info",
-    leaveId?: string,
-  ) {
-    try {
-      await prisma.notification.create({
-        data: { userId, title, message, type, leaveId: leaveId || null },
-      })
-    } catch (err) {
-      logger.error(
-        `Failed to create notification for user=${userId} | ${title} | ${message} | ${(err as Error).message}`,
-      )
-    }
+  userId: string,
+  title: string,
+  message: string,
+  type: "info" | "success" | "error" = "info",
+  leaveId?: string
+) {
+  try {
+    const notification = await prisma.notification.create({
+      data: {
+        userId,
+        title,
+        message,
+        type,
+        leaveId: leaveId || null,
+        isRead: false,
+      },
+    });
+    logger.info(`✅ Notification created | user=${userId} | title="${title}"`);
+    return notification;
+  } catch (err) {
+    logger.error(`❌ Failed to create notification | user=${userId} | title="${title}" | ${(err as Error).message}`);
+    // Do not throw to avoid breaking leave flow
   }
 }
-
+}
 export const leaveController = new LeaveController()

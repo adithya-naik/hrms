@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../prisma-client" 
 }
 
 datasource db {
@@ -120,8 +121,8 @@ model Leave {
   id              String           @id @default(cuid())
   requesterId     String
   approverId      String?
-  leavePolicyId   String
-  leavePolicy     LeavePolicy      @relation("LeavePolicyToLeaves", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  leavePolicyId   String?
+  leavePolicy     LeavePolicy?     @relation("LeavePolicyToLeaves", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
   leaveType       LeaveType
   startDate       DateTime
   endDate         DateTime
