@@ -9,6 +9,7 @@ import { errorHandler } from './middleware/errorHandler';
 import { routes } from './routes';
 import { logger } from './utils/logger';
 import 'express-async-errors';
+import { startLeaveReminderJob } from "./jobs/leaveReminderJob"
 import dotenv from 'dotenv';
 dotenv.config(); // Load .env variables
 
@@ -74,5 +75,7 @@ app.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
   logger.info(`📚 Environment: ${config.NODE_ENV}`);
 });
+
+startLeaveReminderJob();
 
 export default app;
