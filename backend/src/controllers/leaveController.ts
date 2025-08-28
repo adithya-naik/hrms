@@ -10,7 +10,7 @@ import multer from "multer"
 import path from "path"
 import { safeDate } from "../utils/date"
 import { format } from "date-fns"
-import { getWorkingDays } from "../utils/holidays"
+import { getWorkingDays, getSandwichLeaveDays } from "../utils/holidays"
 
 // Utility: Add days to a Date object
 function addDays(date: Date, days: number) {
@@ -159,22 +159,28 @@ class LeaveController {
       // Validate against balances & overlapping
       await this.validateLeaveRequest(userId, data)
 
-      const totalDays = this.calculateLeaveDays(data.startDate, data.endDate, data.isHalfDay)
+      const { totalDays: workingDays } = this.calculateLeaveDays(data.startDate, data.endDate, data.isHalfDay);
       const policy = await prisma.leavePolicy.findUnique({ where: { leaveType: data.leaveType } })
       if (!policy) throw new Error("Leave policy not found")
 
-      const { regularDays, lopDays, isLOP } = await this.calculateLeaveDistribution(
+      // Calculate leave distribution, which will handle sandwich days if no balance is available
+      const { regularDays, lopDays, isLOP, sandwichDays } = await this.calculateLeaveDistribution(
         userId,
         data.leaveType,
-        totalDays,
+        workingDays,
         data.startDate.getFullYear(),
+        data.startDate,
+        data.endDate
       )
+      
+      // Total days is working days plus any sandwich days (if applicable)
+      const totalDays = workingDays + sandwichDays;
 
       // 1️⃣ Create main leave
       const leave = await prisma.leave.create({
         data: {
           ...data,
-          totalDays,
+          totalDays, // This is a number, not an object
           leavePolicyId: policy.id,
           isLOP: isLOP || lopDays > 0, // Mark as LOP if any days are LOP
           requesterId: userId,
@@ -355,6 +361,8 @@ class LeaveController {
           leave.leaveType,
           leave.totalDays,
           leave.startDate.getFullYear(),
+          leave.startDate,
+          leave.endDate
         )
       })
 
@@ -494,10 +502,11 @@ class LeaveController {
       }
 
       await prisma.$transaction(async (tx) => {
-        // Update leave status
-        await tx.leave.update({
+        // First update the leave status to CANCELLED
+        const cancelledLeave = await tx.leave.update({
           where: { id },
           data: { status: LeaveStatus.CANCELLED },
+          include: { dayStatuses: true }
         })
 
         // Update all day statuses to CANCELLED
@@ -506,14 +515,24 @@ class LeaveController {
           data: { status: LeaveStatus.CANCELLED },
         })
 
+        // Only restore balance if the leave was previously APPROVED
         if (leave.status === LeaveStatus.APPROVED) {
-          await this.restoreLeaveBalanceOnCancel(
-            tx,
-            leave.requesterId,
-            leave.leaveType,
-            leave.totalDays,
-            leave.startDate.getFullYear(),
-          )
+          // Calculate the actual number of days to restore (excluding rejected days if any)
+          const approvedDays = cancelledLeave.dayStatuses
+            .filter(day => day.status === LeaveStatus.APPROVED)
+            .length;
+            
+          if (approvedDays > 0) {
+            await this.restoreLeaveBalanceOnCancel(
+              tx,
+              leave.requesterId,
+              leave.leaveType,
+              approvedDays,
+              leave.startDate.getFullYear(),
+              leave.startDate,
+              leave.endDate
+            )
+          }
         }
         // If leave was pending, no balance changes were made, so nothing to restore
       })
@@ -745,6 +764,8 @@ class LeaveController {
         leave.leaveType,
         leave.totalDays,
         leave.startDate.getFullYear(),
+        leave.startDate,
+        leave.endDate
       )
     })
 
@@ -825,6 +846,8 @@ class LeaveController {
         leave.leaveType,
         approvedDays.length,
         leave.startDate.getFullYear(),
+        leave.startDate,
+        leave.endDate
       )
     })
   }
@@ -835,17 +858,25 @@ class LeaveController {
   private async calculateLeaveDistribution(
     userId: string,
     leaveType: LeaveType,
-    totalDays: number,
+    workingDays: number,
     year: number,
-  ): Promise<{ regularDays: number; lopDays: number; isLOP: boolean }> {
-    // LOP leaves are always LOP
+    startDate: Date,
+    endDate: Date
+  ): Promise<{ regularDays: number; lopDays: number; isLOP: boolean; sandwichDays: number }> {
+    // If it's an LOP request, all days are LOP days
     if (leaveType === LeaveType.LOP) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
+      return { 
+        regularDays: 0, 
+        lopDays: workingDays, 
+        isLOP: true, 
+        sandwichDays: 0 
+      };
     }
 
-    const leavePolicyId = await this.getLeavePolicyId(leaveType)
+    // Get the employee's leave balance
+    const leavePolicyId = await this.getLeavePolicyId(leaveType);
     if (!leavePolicyId) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
+      throw new Error(`No active policy found for leave type: ${leaveType}`);
     }
 
     const balance = await prisma.leaveBalance.findUnique({
@@ -856,22 +887,40 @@ class LeaveController {
           year,
         },
       },
-    })
+    });
 
-    if (!balance) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
+    const availableDays = balance?.availableDays || 0;
+
+    // If no balance or no available days, check for sandwich days
+    if (availableDays <= 0) {
+      // Get sandwich days (Sundays between working days)
+      const sandwichDays = getSandwichLeaveDays(startDate, endDate);
+      return { 
+        regularDays: 0, 
+        lopDays: workingDays + sandwichDays, 
+        isLOP: true, 
+        sandwichDays 
+      };
     }
 
-    // Calculate how many days can be taken from regular quota
-    const availableRegularDays = Math.max(0, balance.availableDays)
-    const regularDays = Math.min(totalDays, availableRegularDays)
-    const lopDays = Math.max(0, totalDays - regularDays)
+    // If enough balance, use regular leave days for working days only
+    if (availableDays >= workingDays) {
+      return { 
+        regularDays: workingDays, 
+        lopDays: 0, 
+        isLOP: false, 
+        sandwichDays: 0 
+      };
+    }
 
+    // If partial balance, use available regular days and rest as LOP
+    // Note: We don't consider sandwich days here since there's some leave balance
     return {
-      regularDays,
-      lopDays,
-      isLOP: lopDays > 0,
-    }
+      regularDays: availableDays,
+      lopDays: workingDays - availableDays,
+      isLOP: true,
+      sandwichDays: 0
+    };
   }
 
   private async updateLeaveBalanceOnApproval(
@@ -880,8 +929,21 @@ class LeaveController {
     leaveType: LeaveType,
     totalDays: number,
     year: number,
+    startDate: Date,
+    endDate: Date
   ) {
-    const { regularDays, lopDays } = await this.calculateLeaveDistribution(userId, leaveType, totalDays, year)
+    // First get working days to calculate distribution
+    const { totalDays: workingDays } = this.calculateLeaveDays(startDate, endDate, false);
+    
+    // Calculate distribution including sandwich days if applicable
+    const { regularDays, lopDays } = await this.calculateLeaveDistribution(
+      userId, 
+      leaveType, 
+      workingDays, 
+      year,
+      startDate,
+      endDate
+    )
 
     // Update regular leave balance if any regular days are used
     if (regularDays > 0 && leaveType !== LeaveType.LOP) {
@@ -900,17 +962,34 @@ class LeaveController {
     leaveType: LeaveType,
     totalDays: number,
     year: number,
+    startDate: Date,
+    endDate: Date
   ) {
-    const { regularDays, lopDays } = await this.calculateLeaveDistribution(userId, leaveType, totalDays, year)
+    // Get the leave record to check if it was marked as LOP
+    const leave = await tx.leave.findFirst({
+      where: {
+        requesterId: userId,
+        startDate,
+        endDate,
+        leaveType,
+        status: LeaveStatus.CANCELLED
+      }
+    });
 
-    // Restore regular leave balance if any regular days were used
-    if (regularDays > 0 && leaveType !== LeaveType.LOP) {
-      await this.updateSpecificLeaveBalance(tx, userId, leaveType, regularDays, "cancel", year)
+    if (!leave) {
+      console.warn('Could not find cancelled leave record for balance restoration');
+      return;
     }
 
-    // Restore LOP balance if any LOP days were used
-    if (lopDays > 0) {
-      await this.updateSpecificLeaveBalance(tx, userId, LeaveType.LOP, lopDays, "cancel", year)
+    // If it was marked as LOP, we need to restore the full amount as LOP
+    if (leave.isLOP) {
+      await this.updateSpecificLeaveBalance(tx, userId, LeaveType.LOP, totalDays, "cancel", year);
+      return;
+    }
+
+    // For non-LOP leaves, restore the regular leave balance
+    if (leaveType !== LeaveType.LOP) {
+      await this.updateSpecificLeaveBalance(tx, userId, leaveType, totalDays, "cancel", year);
     }
   }
 
@@ -1036,14 +1115,21 @@ class LeaveController {
     }
   }
 
-  private calculateLeaveDays(startDate: Date, endDate: Date, isHalfDay: boolean): number {
+  private calculateLeaveDays(startDate: Date, endDate: Date, isHalfDay: boolean): { totalDays: number; workingDays: number; sandwichDays: number } {
     if (isHalfDay) {
-      return 0.5;
+      return { totalDays: 0.5, workingDays: 0.5, sandwichDays: 0 };
     }
     
     // Get the working days between start and end date (inclusive)
     const workingDays = getWorkingDays(startDate, endDate);
-    return workingDays;
+    
+    // Initially, don't include sandwich days in the total
+    // They will be added later if there's no leave balance
+    return { 
+      totalDays: workingDays, 
+      workingDays, 
+      sandwichDays: 0 
+    };
   }
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {

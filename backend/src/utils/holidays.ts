@@ -1,4 +1,4 @@
-import { format, parseISO, isSunday } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 type Holiday = {
   name: string;
@@ -58,4 +58,57 @@ function getWorkingDays(startDate: Date, endDate: Date): number {
   return count;
 }
 
-export { isPublicHoliday, isWorkingDay, getWorkingDays };
+/**
+ * Checks if a date is a Sunday (weekly off)
+ */
+function isSunday(date: Date): boolean {
+  return date.getDay() === 0;
+}
+
+/**
+ * Gets all dates between start and end dates (inclusive)
+ */
+function getDatesInRange(startDate: Date, endDate: Date): Date[] {
+  const dates: Date[] = [];
+  const current = new Date(startDate);
+  current.setHours(0, 0, 0, 0);
+  
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59, 999);
+
+  while (current <= end) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
+  
+  return dates;
+}
+
+/**
+ * Calculates sandwich leave days (Sundays between two working days of leave)
+ */
+function getSandwichLeaveDays(startDate: Date, endDate: Date): number {
+  const dates = getDatesInRange(startDate, endDate);
+  let sandwichDays = 0;
+
+  for (let i = 1; i < dates.length - 1; i++) {
+    const current = dates[i];
+    const prev = dates[i - 1];
+    const next = dates[i + 1];
+
+    // Check if current day is Sunday and not a public holiday
+    if (isSunday(current) && !isPublicHoliday(current)) {
+      // Check if previous and next days are working days
+      const prevIsWorking = isWorkingDay(prev) || isSunday(prev);
+      const nextIsWorking = isWorkingDay(next) || isSunday(next);
+      
+      if (prevIsWorking && nextIsWorking) {
+        sandwichDays++;
+      }
+    }
+  }
+
+  return sandwichDays;
+}
+
+export { isPublicHoliday, isWorkingDay, getWorkingDays, getSandwichLeaveDays };
