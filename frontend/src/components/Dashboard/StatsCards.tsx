@@ -12,6 +12,20 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ stats, userRole }: StatsCardsProps) {
+  // ✅ Correct monthly remaining calculation
+  const getMonthlyRemainingDays = () => {
+    if (!stats?.leaveBalances) return 0;
+
+    return stats.leaveBalances.reduce((sum: number, balance: any) => {
+      const monthlyTotal = balance.monthlyQuota ?? Math.ceil(balance.totalQuota / 12);
+      const used = balance.usedDays ?? 0;
+      const carry = balance.carryForward ?? 0;
+
+      const available = monthlyTotal + carry - used;
+      return sum + available;
+    }, 0);
+  };
+
   const renderEmployeeStats = () => (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
@@ -53,10 +67,8 @@ export function StatsCards({ stats, userRole }: StatsCardsProps) {
           <TrendingUp className="h-4 w-4 text-blue-600" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
-            {stats?.leaveBalances?.reduce((sum: number, balance: any) => sum + balance.availableDays, 0) || 0}
-          </div>
-          <p className="text-xs text-muted-foreground">Available to use</p>
+          <div className="text-2xl font-bold">{getMonthlyRemainingDays()}</div>
+          <p className="text-xs text-muted-foreground">Available to use this month</p>
         </CardContent>
       </Card>
     </div>

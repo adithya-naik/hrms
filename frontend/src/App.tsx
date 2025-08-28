@@ -22,6 +22,7 @@ import ProfilePage from './pages/ProfilePage';
 import Landing from '@/pages/Landing'; // ✅ new landing page
 import { useNotificationsSSE } from "@/hooks/useNotificationsSSE";
 import NotificationsPage from './pages/NotificationsPage';
+import ProjectManagement from '@/pages/ProjectManagement';
 
 const queryClient = new QueryClient();
 const NotificationsSSEInitializer = () => {
@@ -90,6 +91,16 @@ const App = () => (
                 element={
                   <ProtectedRoute roles={['MANAGER', 'HR', "ADMIN"]}>
                     <TeamLeaves />
+                  </ProtectedRoute>
+                }
+              />
+
+
+              <Route
+                path="projects"
+                element={
+                 <ProtectedRoute roles={['ADMIN']}>
+                    <ProjectManagement />
                   </ProtectedRoute>
                 }
               />

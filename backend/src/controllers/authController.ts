@@ -216,22 +216,47 @@ async getProfile(req: AuthRequest, res: Response) {
     }
   }
 
-  private async initializeLeaveBalances(userId: string) {
-    const currentYear = new Date().getFullYear();
-    const policies = await prisma.leavePolicy.findMany({ where: { isActive: true } });
-    if (policies.length === 0) return;
+ private async initializeLeaveBalances(userId: string) {
+  const currentYear = new Date().getFullYear();
+  const policies = await prisma.leavePolicy.findMany({ where: { isActive: true } });
+  if (!policies.length) return;
 
-    await prisma.leaveBalance.createMany({
-      data: policies.map((policy) => ({
+  const data: any[] = [];
+
+  for (const policy of policies) {
+    if (policy.monthlyQuota && policy.monthlyQuota > 0) {
+      // Monthly leave: create 12 entries
+      for (let month = 1; month <= 12; month++) {
+        data.push({
+          userId,
+          leavePolicyId: policy.id,
+          year: currentYear,
+          month,
+          totalQuota: policy.monthlyQuota,
+          availableDays: policy.monthlyQuota,
+          resetDate: new Date(currentYear, month - 1, policy.quotaResetDay ?? 1),
+        });
+      }
+    } else {
+      // Annual leave: create a single entry
+      data.push({
         userId,
         leavePolicyId: policy.id,
         year: currentYear,
+        month: null, // no month for annual leave
         totalQuota: policy.annualQuota,
         availableDays: policy.annualQuota,
-      })),
-      skipDuplicates: true,
-    });
+        resetDate: new Date(currentYear, 0, policy.quotaResetDay ?? 1),
+      });
+    }
   }
+
+  await prisma.leaveBalance.createMany({
+    data,
+    skipDuplicates: true,
+  });
+}
+
 }
 
 export const authController = new AuthController();

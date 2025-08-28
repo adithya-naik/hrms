@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../prisma-client" 
 }
 
 datasource db {
@@ -8,76 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-//
-// Enums
-//
-enum UserRole {
-  EMPLOYEE
-  MANAGER
-  HR
-  ADMIN
-}
-
-enum LeaveType {
-  SICK
-  CASUAL
-  WFH
-  LOP
-}
-
-enum LeaveStatus {
-  PENDING
-  APPROVED
-  REJECTED
-  CANCELLED
-  PARTIAL // 🔥 NEW: For partial approvals
-}
-
-enum AuditAction {
-  CREATE
-  UPDATE
-  DELETE
-  APPROVE
-  REJECT
-  CANCEL
-}
-
-//
-// Models
-//
 model User {
-  id           String   @id @default(cuid())
-  username     String   @unique
-  auth0Id      String?  @unique
-  email        String   @unique
-  password     String
-  firstName    String
-  lastName     String
-  employeeId   String   @unique
-  role         UserRole @default(EMPLOYEE)
-  managerId    String?
-  hrId         String? // 👈 NEW: reference to HR user
-  departmentId String?
-  isActive     Boolean  @default(true)
-  joinDate     DateTime @default(now())
-  profileImage String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  manager   User?  @relation("ManagerEmployee", fields: [managerId], references: [id])
-  employees User[] @relation("ManagerEmployee")
-
-  hr          User?  @relation("HREmployee", fields: [hrId], references: [id]) // 👈 NEW
-  hrEmployees User[] @relation("HREmployee") // 👈 NEW
-
-  department     Department?    @relation(fields: [departmentId], references: [id])
-  leaveRequests  Leave[]        @relation("LeaveRequester")
-  approvedLeaves Leave[]        @relation("LeaveApprover")
-  leaveBalances  LeaveBalance[]
+  id             String         @id @default(cuid())
+  auth0Id        String?        @unique
+  email          String         @unique
+  firstName      String
+  lastName       String
+  employeeId     String         @unique
+  role           UserRole       @default(EMPLOYEE)
+  managerId      String?
+  departmentId   String?
+  isActive       Boolean        @default(true)
+  joinDate       DateTime       @default(now())
+  profileImage   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  password       String
+  username       String         @unique
+  hrId           String?
   auditLogs      AuditLog[]
+  leaveBalances  LeaveBalance[]
+  approvedLeaves Leave[]        @relation("LeaveApprover")
+  leaveRequests  Leave[]        @relation("LeaveRequester")
   notifications  Notification[]
-
+  department     Department?    @relation(fields: [departmentId], references: [id])
+  hr             User?          @relation("HREmployee", fields: [hrId], references: [id])
+  hrEmployees    User[]         @relation("HREmployee")
+  manager        User?          @relation("ManagerEmployee", fields: [managerId], references: [id])
+  employees      User[]         @relation("ManagerEmployee")
+  projects       Project[]
   @@map("users")
 }
 
@@ -89,60 +47,58 @@ model Department {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
-  // Relations
-  users User[]
+  users       User[]
 
   @@map("departments")
 }
 
 model LeavePolicy {
-  id                  String    @id @default(cuid())
-  leaveType           LeaveType @unique
+  id                  String         @id @default(cuid())
+  leaveType           LeaveType      @unique
   annualQuota         Int
+  monthlyQuota        Int            // NEW
+  quotaResetDay       Int            @default(1) // NEW
   maxConsecutiveDays  Int?
-  minDaysNotice       Int       @default(1)
-  requiresApproval    Boolean   @default(true)
-  requiresDocument    Boolean   @default(false)
-  carryForwardAllowed Boolean   @default(false)
+  minDaysNotice       Int            @default(1)
+  requiresApproval    Boolean        @default(true)
+  requiresDocument    Boolean        @default(false)
+  carryForwardAllowed Boolean        @default(false)
   maxCarryForward     Int?
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-
-  // Relations
-  leaves        Leave[]        @relation("LeavePolicyToLeaves")
-  leaveBalances LeaveBalance[] @relation("LeavePolicyToBalances")
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  leaveBalances       LeaveBalance[] @relation("LeavePolicyToBalances")
+  leaves              Leave[]        @relation("LeavePolicyToLeaves")
 
   @@map("leave_policies")
 }
 
-model Leave {
-  id              String           @id @default(cuid())
-  requesterId     String
-  approverId      String?
-  leavePolicyId   String?
-  leavePolicy     LeavePolicy?     @relation("LeavePolicyToLeaves", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
-  leaveType       LeaveType
-  startDate       DateTime
-  endDate         DateTime
-  totalDays       Float
-  reason          String
-  status          LeaveStatus      @default(PENDING)
-  appliedDate     DateTime         @default(now())
-  approvedDate    DateTime?
-  rejectionReason String?
-  attachments     String[]         @default([])
-  isHalfDay       Boolean          @default(false)
-  emergencyLeave  Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  lastReminderSent DateTime?       
-  dayStatuses     LeaveDayStatus[] // 🔥 CASCADE DELETE handled by Prisma
-  isLOP           Boolean          @default(false)
 
-  requester User  @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
-  approver  User? @relation("LeaveApprover", fields: [approverId], references: [id], onDelete: SetNull) // 🔥 ADDED SET NULL
+model Leave {
+  id               String           @id @default(cuid())
+  requesterId      String
+  approverId       String?
+  leaveType        LeaveType
+  startDate        DateTime
+  endDate          DateTime
+  totalDays        Float
+  reason           String
+  status           LeaveStatus      @default(PENDING)
+  appliedDate      DateTime         @default(now())
+  approvedDate     DateTime?
+  rejectionReason  String?
+  attachments      String[]         @default([])
+  isHalfDay        Boolean          @default(false)
+  emergencyLeave   Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  isLOP            Boolean          @default(false)
+  leavePolicyId    String?
+  lastReminderSent DateTime?
+  dayStatuses      LeaveDayStatus[]
+  approver         User?            @relation("LeaveApprover", fields: [approverId], references: [id])
+  leavePolicy      LeavePolicy?     @relation("LeavePolicyToLeaves", fields: [leavePolicyId], references: [id], onDelete: Cascade)
+  requester        User             @relation("LeaveRequester", fields: [requesterId], references: [id], onDelete: Cascade)
 
   @@map("leaves")
 }
@@ -152,33 +108,31 @@ model LeaveDayStatus {
   leaveId String
   date    DateTime
   status  LeaveStatus @default(PENDING)
-  reason  String? // optional rejection reason
-
-  // Relations
-  leave Leave @relation(fields: [leaveId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  reason  String?
+  leave   Leave       @relation(fields: [leaveId], references: [id], onDelete: Cascade)
 
   @@unique([leaveId, date])
   @@map("leave_day_statuses")
 }
 
 model LeaveBalance {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   userId        String
   leavePolicyId String
   year          Int
+  month         Int         // NEW
   totalQuota    Int
-  usedDays      Float    @default(0)
-  pendingDays   Float    @default(0)
+  usedDays      Float       @default(0)
+  pendingDays   Float       @default(0)
   availableDays Float
-  carryForward  Float    @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  carryForward  Float       @default(0)
+  resetDate     DateTime    // NEW
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  leavePolicy   LeavePolicy @relation("LeavePolicyToBalances", fields: [leavePolicyId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Relations
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
-  leavePolicy LeavePolicy @relation("LeavePolicyToBalances", fields: [leavePolicyId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
-
-  @@unique([userId, leavePolicyId, year])
+  @@unique([userId, leavePolicyId, year, month])
   @@map("leave_balances")
 }
 
@@ -193,6 +147,22 @@ model Holiday {
   updatedAt   DateTime @updatedAt
 
   @@map("holidays")
+}
+
+
+model Project {
+  id             String   @id @default(cuid())
+  projectName    String
+  clientName     String
+  revenue        Float?
+  managerId      String
+  priority       String
+  allocatedHours Int?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  manager        User     @relation(fields: [managerId], references: [id])
 }
 
 model Setting {
@@ -221,9 +191,7 @@ model Notification {
   leaveId   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
@@ -239,9 +207,38 @@ model AuditLog {
   ipAddress  String?
   userAgent  String?
   timestamp  DateTime    @default(now())
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade) // 🔥 ADDED CASCADE
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
+}
+
+enum UserRole {
+  EMPLOYEE
+  MANAGER
+  HR
+  ADMIN
+}
+
+enum LeaveType {
+  SICK
+  CASUAL
+  WFH
+  LOP
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  PARTIAL
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  CANCEL
 }

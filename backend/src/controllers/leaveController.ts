@@ -845,13 +845,14 @@ class LeaveController {
     if (!leavePolicyId) {
       return { regularDays: 0, lopDays: totalDays, isLOP: true }
     }
-
+const month = new Date().getMonth() + 1
     const balance = await prisma.leaveBalance.findUnique({
       where: {
-        userId_leavePolicyId_year: {
+         userId_leavePolicyId_year_month: {
           userId,
           leavePolicyId,
           year,
+          month,
         },
       },
     })
@@ -930,10 +931,11 @@ class LeaveController {
 
       let balance = await tx.leaveBalance.findUnique({
         where: {
-          userId_leavePolicyId_year: {
+          userId_leavePolicyId_year_month: {
             userId,
             leavePolicyId,
             year,
+            month: new Date().getMonth() + 1,
           },
         },
       })
@@ -982,13 +984,14 @@ class LeaveController {
       // Ensure values don't go negative
       nextUsed = Math.max(0, nextUsed)
       nextAvail = Math.max(0, nextAvail)
-
+const month = new Date().getMonth() + 1
       await tx.leaveBalance.update({
         where: {
-          userId_leavePolicyId_year: {
+          userId_leavePolicyId_year_month: {
             userId,
             leavePolicyId,
             year,
+            month,
           },
         },
         data: {

@@ -8,6 +8,7 @@ import { config } from './config/config';
 import { errorHandler } from './middleware/errorHandler';
 import { routes } from './routes';
 import { logger } from './utils/logger';
+import projectRoutes from "./routes/projectRoutes";
 import 'express-async-errors';
 import { startLeaveReminderJob } from "./jobs/leaveReminderJob"
 import dotenv from 'dotenv';
@@ -62,6 +63,7 @@ app.get('/health', (req, res) => {
 // ---------------- API routes ----------------
 app.use('/api', routes);
 
+app.use("/api/projects", projectRoutes);
 // ---------------- Error handling ----------------
 app.use(errorHandler);
 

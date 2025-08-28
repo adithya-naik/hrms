@@ -1,10 +1,15 @@
-import { PrismaClient, UserRole, LeaveType, LeaveStatus } from '@prisma/client';
+// prisma/seed.ts
+import { PrismaClient, UserRole, LeaveType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting database seeding...');
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // JS months are 0-indexed
+  const nextMonthReset = new Date(currentYear, currentMonth, 1); // first day of next month
 
   // ----------------------
   // Departments
@@ -55,6 +60,8 @@ async function main() {
       create: {
         leaveType: LeaveType.SICK,
         annualQuota: 12,
+        monthlyQuota: Math.ceil(12 / 12),
+        quotaResetDay: 1,
         maxConsecutiveDays: 5,
         minDaysNotice: 0,
         requiresApproval: true,
@@ -68,6 +75,8 @@ async function main() {
       create: {
         leaveType: LeaveType.CASUAL,
         annualQuota: 15,
+        monthlyQuota: Math.ceil(15 / 12),
+        quotaResetDay: 1,
         maxConsecutiveDays: 3,
         minDaysNotice: 1,
         requiresApproval: true,
@@ -82,6 +91,8 @@ async function main() {
       create: {
         leaveType: LeaveType.LOP,
         annualQuota: 5,
+        monthlyQuota: Math.ceil(5 / 12),
+        quotaResetDay: 1,
         maxConsecutiveDays: 2,
         minDaysNotice: 3,
         requiresApproval: true,
@@ -95,6 +106,8 @@ async function main() {
       create: {
         leaveType: LeaveType.WFH,
         annualQuota: 50,
+        monthlyQuota: Math.ceil(50 / 12),
+        quotaResetDay: 1,
         maxConsecutiveDays: 5,
         minDaysNotice: 1,
         requiresApproval: true,
@@ -106,85 +119,84 @@ async function main() {
   console.log('✅ Created/Upserted leave policies');
 
   // ----------------------
-  // Users (your emails)
-  // ----------------------
-  const hashedPassword = await bcrypt.hash('Password123', 10);
-
-  const admin = await prisma.user.upsert({
-    where: { email: 'jatothadithyanaik@gmail.com' },
-    update: {},
-    create: {
-      email: 'jatothadithyanaik@gmail.com',
-      username: 'adminuser',
-      password: hashedPassword,
-      firstName: 'Admin',
-      lastName: 'User',
-      employeeId: 'EMP001',
-      role: UserRole.ADMIN,
-      departmentId: departments[1].id, // HR
-      joinDate: new Date('2020-01-01'),
-      isActive: true, 
+// Helper function to safely upsert user by email
+// ----------------------
+async function safeUpsertUser(email: string, employeeId: string, data: any) {
+  // Remove any conflicting employeeId that doesn’t belong to this email
+  await prisma.user.deleteMany({
+    where: {
+      employeeId,
+      NOT: { email },
     },
   });
 
-  const hr = await prisma.user.upsert({
-    where: { email: 'adithyanaikaj@gmail.com' },
-    update: {},
-    create: {
-      email: 'adithyanaikaj@gmail.com',
-      username: 'hrmanager',
-      password: hashedPassword,
-      firstName: 'HR',
-      lastName: 'Manager',
-      employeeId: 'EMP002',
-      role: UserRole.HR,
-      departmentId: departments[1].id,
-      joinDate: new Date('2020-06-01'),
-      isActive: true, 
-    },
+  // Upsert the user by email
+  return prisma.user.upsert({
+    where: { email },
+    update: data,
+    create: { email, ...data },
   });
+}
 
-  const manager = await prisma.user.upsert({
-    where: { email: 'adithyaj219@gmail.com' },
-    update: {},
-    create: {
-      email: 'adithyaj219@gmail.com',
-      username: 'manager1',
-      password: hashedPassword,
-      firstName: 'Manager',
-      lastName: 'One',
-      employeeId: 'EMP003',
-      role: UserRole.MANAGER,
-      departmentId: departments[0].id,
-      joinDate: new Date('2021-01-15'),
-      isActive: true, 
-    },
-  });
+// ----------------------
+// Users
+// ----------------------
+const hashedPassword = await bcrypt.hash('Password123', 10);
 
-  const employee = await prisma.user.upsert({
-    where: { email: 'idbhosting@gmail.com' },
-    update: {},
-    create: {
-      email: 'idbhosting@gmail.com',
-      username: 'employee1',
-      password: hashedPassword,
-      firstName: 'Employee',
-      lastName: 'One',
-      employeeId: 'EMP004',
-      role: UserRole.EMPLOYEE,
-      managerId: manager.id,
-      departmentId: departments[0].id,
-      joinDate: new Date('2021-03-01'),
-      isActive: true, 
-    },
-  });
+const admin = await safeUpsertUser('nareshsirvi726@gmail.com', 'EMP001', {
+  username: 'adminuser',
+  password: hashedPassword,
+  firstName: 'Admin',
+  lastName: 'User',
+  employeeId: 'EMP001',
+  role: UserRole.ADMIN,
+  departmentId: departments[1].id, // HR
+  joinDate: new Date('2020-01-01'),
+  isActive: true,
+});
 
-  console.log('✅ Created/Upserted your 4 main users');
+const hr = await safeUpsertUser('nareshsirvi604@gmail.com', 'EMP002', {
+  username: 'hrmanager',
+  password: hashedPassword,
+  firstName: 'HR',
+  lastName: 'Manager',
+  employeeId: 'EMP002',
+  role: UserRole.HR,
+  departmentId: departments[1].id,
+  joinDate: new Date('2020-06-01'),
+  isActive: true,
+});
 
-  // ----------------------
+const manager = await safeUpsertUser('dollyavula09@gmail.com', 'EMP003', {
+  username: 'manager1',
+  password: hashedPassword,
+  firstName: 'Manager',
+  lastName: 'One',
+  employeeId: 'EMP003',
+  role: UserRole.MANAGER,
+  departmentId: departments[0].id,
+  joinDate: new Date('2021-01-15'),
+  isActive: true,
+});
+
+const employee = await safeUpsertUser('dolly75rohi@gmail.com', 'EMP004', {
+  username: 'employee1',
+  password: hashedPassword,
+  firstName: 'Employee',
+  lastName: 'One',
+  employeeId: 'EMP004',
+  role: UserRole.EMPLOYEE,
+  managerId: manager.id,
+  departmentId: departments[0].id,
+  joinDate: new Date('2021-03-01'),
+  isActive: true,
+});
+
+console.log('✅ Created/Upserted your 4 main users');
+
+  
   // Holidays
   // ----------------------
-  const currentYear = new Date().getFullYear();
   await Promise.all([
     prisma.holiday.upsert({
       where: { name: "New Year's Day" },
@@ -210,7 +222,7 @@ async function main() {
   console.log('✅ Created/Upserted holidays');
 
   // ----------------------
-  // Leave balances (for the 4 users only)
+  // Leave balances (with monthly quota fields)
   // ----------------------
   const allUsers = [admin, hr, manager, employee];
 
@@ -218,10 +230,11 @@ async function main() {
     for (const policy of leavePolicies) {
       await prisma.leaveBalance.upsert({
         where: {
-          userId_leavePolicyId_year: {
+          userId_leavePolicyId_year_month: {
             userId: user.id,
             leavePolicyId: policy.id,
             year: currentYear,
+            month: currentMonth,
           },
         },
         update: {},
@@ -229,11 +242,13 @@ async function main() {
           userId: user.id,
           leavePolicyId: policy.id,
           year: currentYear,
+          month: currentMonth,
           totalQuota: policy.annualQuota,
           usedDays: 0,
           pendingDays: 0,
           availableDays: policy.annualQuota,
           carryForward: 0,
+          resetDate: nextMonthReset,
         },
       });
     }

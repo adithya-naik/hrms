@@ -29,10 +29,11 @@ const navigation = [
   { name: "Reports", href: "/app/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
   { name: "Users", href: "/app/users", icon: Users, roles: ["HR", "ADMIN"] },
   { name: "Settings", href: "/app/settings", icon: Settings, roles: ["ADMIN"] },
+  { name: "Project Management", href: "/app/projects", icon: FileText, roles: ["ADMIN"] }, // ✅ Add this
   { name: "My Profile", href: "/app/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "Notifications", href: "/app/notifications", icon: Bell, roles: ["EMPLOYEE", "MANAGER", "HR"] },
-
 ];
+
 
 
 export function Sidebar() {

@@ -7,9 +7,9 @@ import { Calendar, Briefcase, Mail, User as UserIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
 
 export default function ProfilePage() {
-const { data, isLoading, isError } = useGetProfileQuery(undefined, {
-  refetchOnMountOrArgChange: true,
-});
+  const { data, isLoading, isError } = useGetProfileQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
 
   if (isLoading) {
     return <p className="p-6 text-center">Loading profile...</p>;
@@ -23,18 +23,22 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
     );
   }
 
-  // unwrap the actual user
   const user = data.user;
 
-  // Safe initials
   const initials = `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase();
 
-  // Pie chart data
+  // Pie chart data using monthly available leaves
   const leaveData =
-    user.leaveBalances?.map((lb: any) => ({
-      name: lb.leavePolicy?.leaveType ?? "Unknown",
-      value: lb.availableDays ?? 0,
-    })) ?? [];
+    user.leaveBalances?.map((lb: any) => {
+      const monthlyQuota = lb.leavePolicy?.monthlyQuota ?? Math.ceil((lb.totalQuota ?? 0) / 12);
+      const used = lb.usedDays ?? 0;
+      const carry = lb.carryForward ?? 0;
+      const available = monthlyQuota + carry - used;
+      return {
+        name: lb.leavePolicy?.leaveType ?? "Unknown",
+        value: available > 0 ? available : 0,
+      };
+    }) ?? [];
 
   const COLORS = ["#4f46e5", "#22c55e", "#f59e0b", "#ef4444", "#0ea5e9", "#9333ea"];
 
@@ -89,14 +93,12 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
       </Card>
 
       {/* Manager & HR Info */}
-      {/* Manager & HR Info */}
       {user.role !== "ADMIN" && (user.manager || user.hr) && (
         <Card>
           <CardHeader>
             <CardTitle>Reporting To</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Employee: Manager + HR */}
             {user.role === "EMPLOYEE" && (
               <>
                 {user.manager && (
@@ -155,7 +157,6 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
               </>
             )}
 
-            {/* Manager OR HR themselves: Show only HR */}
             {(user.role === "MANAGER" || user.role === "HR") && user.hr && (
               <div className="flex items-center gap-4">
                 <Avatar>
@@ -186,7 +187,6 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
         </Card>
       )}
 
-
       {/* Leave Balances */}
       <Card>
         <CardHeader>
@@ -196,25 +196,31 @@ const { data, isLoading, isError } = useGetProfileQuery(undefined, {
           {/* Leave List */}
           <div className="space-y-4">
             {user.leaveBalances?.length ? (
-              user.leaveBalances.map((lb: any) => (
-                <div
-                  key={lb.id}
-                  className="p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center"
-                >
-                  <div>
-                    <h3 className="font-semibold">
-                      {lb.leavePolicy?.leaveType ?? "Unknown"}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Quota: {lb.totalQuota ?? 0} | Used: {lb.usedDays ?? 0} | Pending:{" "}
-                      {lb.pendingDays ?? 0}
-                    </p>
+              user.leaveBalances.map((lb: any) => {
+                const monthlyQuota =
+                  lb.leavePolicy?.monthlyQuota ?? Math.ceil((lb.totalQuota ?? 0) / 12);
+                const used = lb.usedDays ?? 0;
+                const pending = lb.pendingDays ?? 0;
+                const carry = lb.carryForward ?? 0;
+                const available = monthlyQuota + carry - used;
+
+                return (
+                  <div
+                    key={lb.id}
+                    className="p-4 border rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center"
+                  >
+                    <div>
+                      <h3 className="font-semibold">{lb.leavePolicy?.leaveType ?? "Unknown"}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Monthly: {monthlyQuota} | Used: {used} | Pending: {pending}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="mt-2 md:mt-0">
+                      Available: {available}
+                    </Badge>
                   </div>
-                  <Badge variant="outline" className="mt-2 md:mt-0">
-                    Available: {lb.availableDays ?? 0}
-                  </Badge>
-                </div>
-              ))
+                );
+              })
             ) : (
               <p className="text-muted-foreground">No leave balances found.</p>
             )}

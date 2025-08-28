@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-
+import * as React from "react"
 import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -13,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { parseISO, startOfDay } from "date-fns"
+import { parseISO, startOfDay, differenceInCalendarDays, format } from "date-fns"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { CalendarIcon, Upload, X, ArrowLeft } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -25,7 +24,6 @@ import {
   useGetMyLeaveDatesQuery,
 } from "@/store/api/leaveApi"
 import { toast } from "@/components/ui/sonner"
-import { format, differenceInCalendarDays } from "date-fns"
 
 // ---------------- Schema ----------------
 const leaveSchema = z
@@ -42,7 +40,6 @@ const leaveSchema = z
     message: "End date must be after start date",
     path: ["endDate"],
   })
-  // ✅ Rule: SICK leave must start from today
   .refine(
     (data) => {
       if (data.leaveType === "SICK") {
@@ -81,11 +78,7 @@ export default function ApplyLeave() {
 
   const form = useForm<LeaveFormData>({
     resolver: zodResolver(leaveSchema),
-    defaultValues: {
-      isHalfDay: false,
-      emergencyLeave: false,
-      attachments: [],
-    },
+    defaultValues: { isHalfDay: false, emergencyLeave: false, attachments: [] },
   })
 
   const watchedLeaveType = form.watch("leaveType")
@@ -93,7 +86,7 @@ export default function ApplyLeave() {
   const watchedEndDate = form.watch("endDate")
   const watchedIsHalfDay = form.watch("isHalfDay")
 
-  // Auto-set end date for sick leave when start date is selected
+  // Auto-set end date for sick leave
   useEffect(() => {
     if (watchedLeaveType === "SICK" && watchedStartDate && !watchedEndDate) {
       form.setValue("endDate", watchedStartDate)
@@ -103,81 +96,62 @@ export default function ApplyLeave() {
   // ---------------- Calculate Days ----------------
   const calculateDays = () => {
     if (!watchedStartDate || !watchedEndDate) return 0
-    if (watchedIsHalfDay) return 0.5
-    const diffTime = Math.abs(watchedEndDate.getTime() - watchedStartDate.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+    let diffDays = differenceInCalendarDays(watchedEndDate, watchedStartDate) + 1
+    if (watchedIsHalfDay) diffDays = 0.5
+
+    // Cap at monthly available leave
+    if (watchedLeaveType && balancesData?.balances) {
+      const balance = balancesData.balances.find(
+        (b: any) => b.leavePolicy?.leaveType === watchedLeaveType
+      )
+      if (balance) {
+        const monthlyQuota = balance.leavePolicy?.monthlyQuota ?? Math.ceil(balance.totalQuota / 12)
+        const usedThisMonth = balance.usedThisMonth ?? 0
+        const availableMonthly = monthlyQuota - usedThisMonth
+        if (diffDays > availableMonthly) diffDays = availableMonthly
+      }
+    }
+
     return diffDays
   }
 
-  // ---------------- Balances & Rules ----------------
+  const totalRequestedDays = calculateDays()
+
+  // ---------------- Sick LOP ----------------
   const sickBalance = balancesData?.balances?.find((b: any) => b.leavePolicy?.leaveType === "SICK")
   const availableSick = sickBalance?.availableDays ?? 0
-
-  const totalRequestedDays = calculateDays()
   const lopDays = watchedLeaveType === "SICK" ? Math.max(0, totalRequestedDays - availableSick) : 0
   const paidDays = totalRequestedDays - lopDays
 
-  const isCasualLeaveTooSoon = () => {
-    if (watchedLeaveType === "CASUAL" && watchedStartDate) {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const start = new Date(watchedStartDate)
-      start.setHours(0, 0, 0, 0)
-      const diffDays = differenceInCalendarDays(start, today)
-      return diffDays < 3
-    }
-    return false
-  }
-
-  // ---------------- Leave Days Processing ----------------
+  // ---------------- Disable dates ----------------
   const leaveDays =
     myLeaves?.map((leave: any) => ({
       date: parseISO(leave.date),
       status: leave.dayStatus,
     })) || []
 
-  // 🔥 FIX: Only disable dates that are NOT cancelled or rejected
-  // Cancelled and rejected leaves should be available for new applications
   const disabledDates = leaveDays
-    .filter((ld) => ld.status === "PENDING" || ld.status === "APPROVED") // Only block pending/approved
+    .filter((ld) => ld.status === "PENDING" || ld.status === "APPROVED")
     .map((ld) => new Date(ld.date))
 
-  // Separate leave days by status for visual highlighting
   const pendingDays = leaveDays.filter((ld) => ld.status === "PENDING").map((ld) => new Date(ld.date))
-
   const approvedDays = leaveDays.filter((ld) => ld.status === "APPROVED").map((ld) => new Date(ld.date))
-
   const rejectedDays = leaveDays.filter((ld) => ld.status === "REJECTED").map((ld) => new Date(ld.date))
-
   const cancelledDays = leaveDays.filter((ld) => ld.status === "CANCELLED").map((ld) => new Date(ld.date))
+
+  const isDateDisabledByLeave = (date: Date) => {
+    return disabledDates.some((d) => d.toDateString() === date.toDateString())
+  }
+
+  const formatLeaveType = (type: string) =>
+    type.replace("_", " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase())
 
   // ---------------- Submit ----------------
   const onSubmit = async (data: LeaveFormData) => {
-    // ✅ check casual leave rule
-    if (isCasualLeaveTooSoon()) {
-      toast.error("Casual leave must be applied at least 3 days in advance.")
-      return
-    }
-
-    // ✅ check sick leave rule before sending (FIXED)
-    if (data.leaveType === "SICK") {
-      const today = startOfDay(new Date()) // Removed subDays(1)
-      const start = startOfDay(new Date(data.startDate))
-
-      if (start.getTime() !== today.getTime()) {
-        toast.error("Sick leave can only be applied for today.")
-        return
-      }
-    }
-
     setIsSubmitting(true)
     try {
-      // Fix timezone issue - send date in local timezone format
-      const formatDateForSubmission = (date: Date) => {
-        // Create a new date in local timezone at start of day
-        const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-        return localDate.toISOString()
-      }
+      const formatDateForSubmission = (date: Date) =>
+        new Date(date.getFullYear(), date.getMonth(), date.getDate()).toISOString()
 
       const formData = new FormData()
       formData.append("leaveType", data.leaveType)
@@ -188,9 +162,7 @@ export default function ApplyLeave() {
       formData.append("emergencyLeave", String(data.emergencyLeave))
 
       const fileInput = document.getElementById("file-upload") as HTMLInputElement
-      if (fileInput?.files) {
-        Array.from(fileInput.files).forEach((file) => formData.append("attachments", file))
-      }
+      if (fileInput?.files) Array.from(fileInput.files).forEach((file) => formData.append("attachments", file))
 
       await createLeave(formData).unwrap()
       toast.success("Leave request submitted successfully!")
@@ -202,32 +174,13 @@ export default function ApplyLeave() {
     }
   }
 
-  // ---------------- File Upload ----------------
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
-    if (files) {
-      const fileNames = Array.from(files).map((file) => file.name)
-      setUploadedFiles((prev) => [...prev, ...fileNames])
-    }
+    if (files) setUploadedFiles((prev) => [...prev, ...Array.from(files).map((f) => f.name)])
   }
 
-  const removeFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
-  }
+  const removeFile = (index: number) => setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
 
-  const formatLeaveType = (type: string) => {
-    return type
-      .replace("_", " ")
-      .toLowerCase()
-      .replace(/\b\w/g, (l) => l.toUpperCase())
-  }
-
-  // Helper function to check if a date is disabled due to existing leave
-  const isDateDisabledByLeave = (date: Date) => {
-    return disabledDates.some((d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd"))
-  }
-
-  // ---------------- UI ----------------
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -267,11 +220,14 @@ export default function ApplyLeave() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {policiesData?.policies?.map((policy: any) => (
-                          <SelectItem key={policy.id} value={policy.leaveType}>
-                            {formatLeaveType(policy.leaveType)} ({policy.annualQuota} days/year)
-                          </SelectItem>
-                        ))}
+                        {policiesData?.policies?.map((policy: any) => {
+                          const monthlyQuota = policy.monthlyQuota ?? Math.ceil(policy.annualQuota / 12)
+                          return (
+                            <SelectItem key={policy.id} value={policy.leaveType}>
+                              {formatLeaveType(policy.leaveType)} ({monthlyQuota} days/month)
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -281,178 +237,134 @@ export default function ApplyLeave() {
 
               {/* Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Start Date */}
                 <FormField
-                  control={form.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Start Date *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground",
-                              )}
-                            >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => {
-                              // Allow today for sick leave, otherwise disable past dates
-                              const today = startOfDay(new Date())
-                              const dateToCheck = startOfDay(date)
+  control={form.control}
+  name="startDate"
+  render={({ field }) => (
+    <FormItem className="flex flex-col">
+      <FormLabel>Start Date *</FormLabel>
+      <Popover>
+        <PopoverTrigger asChild>
+          <FormControl>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full pl-3 text-left font-normal",
+                !field.value && "text-muted-foreground",
+              )}
+            >
+              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+            </Button>
+          </FormControl>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={field.value}
+            onSelect={field.onChange}
+            disabled={(date) => {
+              const today = startOfDay(new Date())
+              const dateToCheck = startOfDay(date)
 
-                              if (watchedLeaveType === "SICK") {
-                                // For sick leave, only allow today
-                                return dateToCheck.getTime() !== today.getTime() || isDateDisabledByLeave(date)
-                              } else {
-                                // For other leave types, disable past dates (before today)
-                                return dateToCheck < today || isDateDisabledByLeave(date)
-                              }
-                            }}
-                            modifiers={{
-                              pending: pendingDays,
-                              approved: approvedDays,
-                              rejected: rejectedDays,
-                              cancelled: cancelledDays,
-                            }}
-                            modifiersClassNames={{
-                              pending: statusColors.PENDING,
-                              approved: statusColors.APPROVED,
-                              rejected: statusColors.REJECTED,
-                              cancelled: statusColors.CANCELLED,
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              // Sick leave: only today
+              if (watchedLeaveType === "SICK") {
+                return dateToCheck.getTime() !== today.getTime() || isDateDisabledByLeave(dateToCheck)
+              }
 
+              // Other leave types: disable past dates
+              return dateToCheck < today || isDateDisabledByLeave(dateToCheck)
+            }}
+            modifiers={{
+              pending: pendingDays,
+              approved: approvedDays,
+              rejected: rejectedDays,
+              cancelled: cancelledDays,
+            }}
+            modifiersClassNames={{
+              pending: statusColors.PENDING,
+              approved: statusColors.APPROVED,
+              rejected: statusColors.REJECTED,
+              cancelled: statusColors.CANCELLED,
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
+
+                {/* End Date */}
                 <FormField
-                  control={form.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>End Date *</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground",
-                              )}
-                            >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => {
-                              const today = startOfDay(new Date())
-                              const dateToCheck = startOfDay(date)
+  control={form.control}
+  name="endDate"
+  render={({ field }) => (
+    <FormItem className="flex flex-col">
+      <FormLabel>End Date *</FormLabel>
+      <Popover>
+        <PopoverTrigger asChild>
+          <FormControl>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full pl-3 text-left font-normal",
+                !field.value && "text-muted-foreground",
+              )}
+            >
+              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+            </Button>
+          </FormControl>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={field.value}
+            onSelect={field.onChange}
+            disabled={(date) => {
+              const startDate = watchedStartDate ? startOfDay(watchedStartDate) : startOfDay(new Date())
+              const dateToCheck = startOfDay(date)
 
-                              if (watchedLeaveType === "SICK") {
-                                const startDate = watchedStartDate ? startOfDay(watchedStartDate) : today
-                                return dateToCheck < startDate || isDateDisabledByLeave(date)
-                              } else {
-                                // For other leave types
-                                const startDate = watchedStartDate ? startOfDay(watchedStartDate) : today
-                                return dateToCheck < startDate || isDateDisabledByLeave(date)
-                              }
-                            }}
-                            modifiers={{
-                              pending: pendingDays,
-                              approved: approvedDays,
-                              rejected: rejectedDays,
-                              cancelled: cancelledDays,
-                            }}
-                            modifiersClassNames={{
-                              pending: statusColors.PENDING,
-                              approved: statusColors.APPROVED,
-                              rejected: statusColors.REJECTED,
-                              cancelled: statusColors.CANCELLED,
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              // Sick leave: only today (or start date)
+              if (watchedLeaveType === "SICK") {
+                return dateToCheck.getTime() !== startDate.getTime() || isDateDisabledByLeave(dateToCheck)
+              }
+
+              // Other leave types: cannot select before start date
+              return dateToCheck < startDate || isDateDisabledByLeave(dateToCheck)
+            }}
+            modifiers={{
+              pending: pendingDays,
+              approved: approvedDays,
+              rejected: rejectedDays,
+              cancelled: cancelledDays,
+            }}
+            modifiersClassNames={{
+              pending: statusColors.PENDING,
+              approved: statusColors.APPROVED,
+              rejected: statusColors.REJECTED,
+              cancelled: statusColors.CANCELLED,
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+
               </div>
 
               {watchedStartDate && watchedEndDate && (
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm font-medium">
-                    Total Days: <span className="text-primary">{calculateDays()}</span>
+                    Total Days: <span className="text-primary">{totalRequestedDays}</span>
                   </p>
-                </div>
-              )}
-
-              {/* Calendar Legend */}
-              <div className="p-4 bg-muted rounded-lg">
-                <p className="text-sm font-medium mb-2">Calendar Legend:</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-yellow-400"></div>
-                    <span>Pending</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-green-500"></div>
-                    <span>Approved</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-red-500"></div>
-                    <span>Rejected (Available)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded bg-gray-400"></div>
-                    <span>Cancelled (Available)</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  * You can apply for leave on rejected or cancelled dates
-                </p>
-              </div>
-
-              {/* SICK LOP warning */}
-              {watchedLeaveType === "SICK" && totalRequestedDays > 0 && (
-                <div className="p-4 mt-2 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-900">
-                  <p>
-                    You have <b>{availableSick}</b> SICK leave day{availableSick !== 1 ? "s" : ""} left.
-                    <br />
-                    Your request is for <b>{totalRequestedDays}</b> day{totalRequestedDays !== 1 ? "s" : ""}.
-                  </p>
-                  {lopDays > 0 ? (
-                    <p>
-                      <b>{paidDays}</b> day{paidDays !== 1 ? "s are" : " is"} paid SICK leave, <br />
-                      <b>{lopDays}</b> day{lopDays !== 1 ? "s will be" : " will be"} counted as <b>LOP (Loss of Pay)</b>
-                      .
-                    </p>
-                  ) : (
-                    <p>All days will be counted as paid SICK leave.</p>
-                  )}
                 </div>
               )}
 
@@ -464,13 +376,8 @@ export default function ApplyLeave() {
                   <FormItem>
                     <FormLabel>Reason for Leave *</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="Please provide a detailed reason for your leave request..."
-                        className="min-h-[100px]"
-                        {...field}
-                      />
+                      <Textarea {...field} placeholder="Please provide reason..." className="min-h-[100px]" />
                     </FormControl>
-                    <FormDescription>Minimum 10 characters required</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -482,14 +389,11 @@ export default function ApplyLeave() {
                   control={form.control}
                   name="isHalfDay"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormItem className="flex items-center space-x-3">
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Half Day Leave</FormLabel>
-                        <FormDescription>Check this if you're applying for a half day leave</FormDescription>
-                      </div>
+                      <FormLabel>Half Day Leave</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -497,14 +401,11 @@ export default function ApplyLeave() {
                   control={form.control}
                   name="emergencyLeave"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormItem className="flex items-center space-x-3">
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Emergency Leave</FormLabel>
-                        <FormDescription>Check this if this is an emergency leave request</FormDescription>
-                      </div>
+                      <FormLabel>Emergency Leave</FormLabel>
                     </FormItem>
                   )}
                 />
@@ -513,44 +414,29 @@ export default function ApplyLeave() {
               {/* Attachments */}
               <div className="space-y-4">
                 <FormLabel>Attachments (Optional)</FormLabel>
-                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6">
-                  <div className="text-center">
-                    <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <div className="mt-4">
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="mt-2 block text-sm font-medium text-gray-900">
-                          Upload supporting documents
-                        </span>
-                        <span className="mt-1 block text-sm text-muted-foreground">
-                          PDF, DOC, DOCX, JPG, PNG up to 10MB
-                        </span>
-                      </label>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                        onChange={handleFileUpload}
-                      />
-                    </div>
-                  </div>
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <label htmlFor="file-upload" className="cursor-pointer block mt-2">
+                    Upload supporting documents (PDF, DOC, DOCX, JPG, PNG up to 10MB)
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    className="sr-only"
+                    multiple
+                    onChange={handleFileUpload}
+                  />
                 </div>
 
-                {uploadedFiles.length > 0 && (
-                  <div className="space-y-2">
-                    <FormLabel>Uploaded Files</FormLabel>
-                    {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
-                        <span className="text-sm">{file}</span>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {uploadedFiles.length > 0 &&
+                  uploadedFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-muted rounded">
+                      <span>{file}</span>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
               </div>
 
               {/* Submit */}
