@@ -9,6 +9,7 @@ import { uploadRoutes } from "./upload";
 import { departmentRoutes } from "./departments";
 import { settingsRoutes } from "./settings";
 import { notificationRoutes } from "./notification";
+import { profileRoutes } from "./profile";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use("/upload", uploadRoutes);
 router.use("/departments", departmentRoutes);
 router.use("/settings", settingsRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/profile", profileRoutes);
 
 export { router as routes };

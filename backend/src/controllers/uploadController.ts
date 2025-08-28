@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
 import { uploadToCloudinary, cloudinary } from '../lib/cloudinary';
 import { createError } from '../middleware/errorHandler';
+import { prisma } from '../lib/prisma';
 
 class UploadController {
   // Upload leave documents (PDF, DOC, DOCX, JPG, PNG)
@@ -35,13 +36,31 @@ class UploadController {
       const filename = `profile_${req.user!.id}_${Date.now()}`;
       const result = await uploadToCloudinary(req.file.buffer, filename, 'profile-pictures');
 
-      // ⚠️ If you want to update user's profile in DB, do it here
-      // e.g., await prisma.user.update({ where: { id: req.user!.id }, data: { profilePicture: result.url } });
+      // Update user's profile with the new image URL
+      const updatedUser = await prisma.user.update({
+        where: { id: req.user!.id },
+        data: { profileImage: result.url },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          profileImage: true,
+          role: true
+        }
+      });
 
       res.json({
-        url: result.url,
-        publicId: result.publicId,
-        filename: req.file.originalname,
+        success: true,
+        message: 'Profile picture updated successfully',
+        data: {
+          user: updatedUser,
+          image: {
+            url: result.url,
+            publicId: result.publicId,
+            filename: req.file.originalname,
+          }
+        }
       });
     } catch (error) {
       console.error('Profile picture upload error:', error);

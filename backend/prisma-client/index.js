@@ -312,7 +312,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\Users\\TG-2004\\Desktop\\Hrms portal\\hrms\\backend\\prisma-client",
+      "value": "/home/tensorgo/Desktop/hrms/backend/prisma-client",
       "fromEnvVar": null
     },
     "config": {
@@ -321,16 +321,16 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "windows",
+        "value": "debian-openssl-3.0.x",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\Users\\TG-2004\\Desktop\\Hrms portal\\hrms\\backend\\prisma\\schema.prisma",
+    "sourceFilePath": "/home/tensorgo/Desktop/hrms/backend/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": "../.env",
+    "rootEnvPath": null,
     "schemaEnvPath": "../.env"
   },
   "relativePath": "../prisma",
@@ -340,6 +340,7 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
+  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
@@ -387,8 +388,8 @@ exports.PrismaClient = PrismaClient
 Object.assign(exports, Prisma)
 
 // file annotations for bundling tools to include these files
-path.join(__dirname, "query_engine-windows.dll.node");
-path.join(process.cwd(), "prisma-client/query_engine-windows.dll.node")
+path.join(__dirname, "libquery_engine-debian-openssl-3.0.x.so.node");
+path.join(process.cwd(), "prisma-client/libquery_engine-debian-openssl-3.0.x.so.node")
 // file annotations for bundling tools to include these files
 path.join(__dirname, "schema.prisma");
 path.join(process.cwd(), "prisma-client/schema.prisma")

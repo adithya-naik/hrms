@@ -10,6 +10,8 @@ import multer from "multer"
 import path from "path"
 import { safeDate } from "../utils/date"
 import { format } from "date-fns"
+import { getWorkingDays } from "../utils/holidays"
+
 // Utility: Add days to a Date object
 function addDays(date: Date, days: number) {
   const result = new Date(date)
@@ -1035,13 +1037,13 @@ class LeaveController {
   }
 
   private calculateLeaveDays(startDate: Date, endDate: Date, isHalfDay: boolean): number {
-    if (isHalfDay) return 0.5
-    const msPerDay = 1000 * 60 * 60 * 24
-    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()
-    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
-    if (end < start) return 0
-    const diffDays = Math.floor((end - start) / msPerDay) + 1
-    return diffDays
+    if (isHalfDay) {
+      return 0.5;
+    }
+    
+    // Get the working days between start and end date (inclusive)
+    const workingDays = getWorkingDays(startDate, endDate);
+    return workingDays;
   }
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {

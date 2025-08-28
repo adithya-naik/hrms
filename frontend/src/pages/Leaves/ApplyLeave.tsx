@@ -100,13 +100,59 @@ export default function ApplyLeave() {
     }
   }, [watchedLeaveType, watchedStartDate, watchedEndDate, form])
 
-  // ---------------- Calculate Days ----------------
+  // List of public holidays for 2025 (YYYY-MM-DD format)
+  const PUBLIC_HOLIDAYS_2025 = [
+    '2025-01-01', // New Year's Day
+    '2025-01-14', // Makar Sankranti
+    '2025-02-26', // Maha Shivaratri
+    '2025-03-14', // Holi
+    '2025-08-15', // Independence Day
+    '2025-08-27', // Ganesh Chaturthi
+    '2025-10-02', // Gandhi Jayanti
+    '2025-10-20', // Dussehra
+    '2025-10-21', // Maha Navami
+    '2025-12-25', // Christmas
+  ]
+
+  // ---------------- Calculate Working Days ----------------
   const calculateDays = () => {
     if (!watchedStartDate || !watchedEndDate) return 0
     if (watchedIsHalfDay) return 0.5
-    const diffTime = Math.abs(watchedEndDate.getTime() - watchedStartDate.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-    return diffDays
+    
+    let count = 0
+    const current = new Date(watchedStartDate)
+    current.setHours(0, 0, 0, 0)
+    const end = new Date(watchedEndDate)
+    end.setHours(23, 59, 59, 999) // Include the entire end date
+    
+    // Create a new date for iteration
+    const currentDate = new Date(current)
+    
+    // Format: YYYY-MM-DD for comparison with PUBLIC_HOLIDAYS_2025
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    
+    while (currentDate <= end) {
+      const day = currentDate.getDay()
+      const dateStr = formatDate(currentDate)
+      
+      // Only exclude Sundays (0) and public holidays
+      if (day !== 0) { // Sunday check
+        // Check if it's not a public holiday
+        if (!PUBLIC_HOLIDAYS_2025.includes(dateStr)) {
+          count++
+        }
+      }
+      
+      // Move to next day
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+    
+    return count || 0.5 // Return at least 0.5 days for single day leave
   }
 
   // ---------------- Balances & Rules ----------------
