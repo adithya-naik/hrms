@@ -7,6 +7,8 @@ import { reportApi } from './api/reportApi';
 import { departmentApi } from './api/departmentApi';
 import { notificationApi } from "./api/notificationApi";
 import { projectApi } from './api/projectApi'; // ✅ import projectApi
+import { taskApi } from './api/taskApi';
+
 import authReducer from './slices/authSlice';
 
 export const store = configureStore({
@@ -19,7 +21,8 @@ export const store = configureStore({
     [reportApi.reducerPath]: reportApi.reducer,
     [departmentApi.reducerPath]: departmentApi.reducer,
     [notificationApi.reducerPath]: notificationApi.reducer,
-    [projectApi.reducerPath]: projectApi.reducer, // ✅ add projectApi reducer
+    [projectApi.reducerPath]: projectApi.reducer,
+    [taskApi.reducerPath]: taskApi.reducer, // ✅ add projectApi reducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -34,7 +37,8 @@ export const store = configureStore({
       reportApi.middleware,
       departmentApi.middleware,
       notificationApi.middleware,
-      projectApi.middleware, // ✅ add projectApi middleware
+      projectApi.middleware,
+      taskApi.middleware, // ✅ add projectApi middleware
     ),
 });
 

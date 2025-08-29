@@ -9,6 +9,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { routes } from './routes';
 import { logger } from './utils/logger';
 import projectRoutes from "./routes/projectRoutes";
+import moduleRoutes from "./routes/moduleRoutes";
+import taskRoutes from "./routes/taskRoutes";
 import 'express-async-errors';
 import { startLeaveReminderJob } from "./jobs/leaveReminderJob"
 import dotenv from 'dotenv';
@@ -64,6 +66,8 @@ app.get('/health', (req, res) => {
 app.use('/api', routes);
 
 app.use("/api/projects", projectRoutes);
+app.use("/api/modules", moduleRoutes);
+app.use("/api/tasks", taskRoutes);
 // ---------------- Error handling ----------------
 app.use(errorHandler);
 
