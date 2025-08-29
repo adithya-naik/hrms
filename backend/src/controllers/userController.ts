@@ -60,19 +60,34 @@ export const userController = {
     }
   },
 
-  async getUsers(req: Request, res: Response) {
-    try {
-      const users = await prisma.user.findMany({
-        include: {
-          department: true,
-          manager: { select: { id: true, firstName: true, lastName: true, email: true } },
-        },
+  async getUsers(req: AuthRequest, res: Response) {
+  try {
+    const requester = req.user; // set by authMiddleware
+    let users;
+
+    if (requester.role === UserRole.MANAGER) {
+      // Manager: only their employees
+      users = await prisma.user.findMany({
+        where: { role: UserRole.EMPLOYEE, managerId: requester.id, isActive: true },
+        select: { id: true, firstName: true, lastName: true, employeeId: true },
       });
-      return res.json(users);
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+    } else if (requester.role === UserRole.HR || requester.role === UserRole.ADMIN) {
+      // HR/Admin: all employees
+      users = await prisma.user.findMany({
+        where: { role: UserRole.EMPLOYEE, isActive: true },
+        select: { id: true, firstName: true, lastName: true, employeeId: true },
+      });
+    } else {
+      // Other roles: forbidden
+      return res.status(403).json({ message: "Forbidden" });
     }
-  },
+
+    return res.json(users);
+  } catch (error: any) {
+    console.error(error);
+    return res.status(500).json({ message: "Failed to fetch users", error: error.message });
+  }
+},
 
   async getUserById(req: Request, res: Response) {
     try {

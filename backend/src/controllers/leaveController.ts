@@ -954,10 +954,12 @@ const month = new Date().getMonth() + 1
             userId,
             leavePolicyId,
             year,
+            month: new Date().getMonth() + 1,
             totalQuota: policy.annualQuota,
             usedDays: 0,
             pendingDays: 0,
             availableDays: policy.annualQuota,
+            resetDate: new Date(),
           },
         })
 

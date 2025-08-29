@@ -8,7 +8,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.post("/", authorize([UserRole.HR, UserRole.ADMIN]), userController.createUser);
-router.get("/", authorize([UserRole.HR, UserRole.ADMIN]), userController.getUsers);
+router.get("/", authorize([UserRole.HR, UserRole.ADMIN,UserRole.MANAGER]), userController.getUsers);
 router.get("/:id", userController.getUserById);
 router.put("/:id", authorize([UserRole.HR, UserRole.ADMIN]), userController.updateUser);
 router.delete("/:id", authorize([UserRole.ADMIN]), userController.deleteUser);
