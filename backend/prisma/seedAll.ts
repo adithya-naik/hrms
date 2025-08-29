@@ -1,0 +1,89 @@
+import { PrismaClient, LeaveType } from "@prisma/client"; // 👈 import enums
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log("🌱 Starting seeding...");
+
+  // ---------------- STEP 1: Seed Settings ----------------
+  const settingData = {
+    id: "cmeo1lc610000okxdq7kd161g", // keep fixed for idempotent seeding
+    companyName: "TensorGo",
+    logoUrl: "https://tensorgo.com/wp-content/uploads/2024/09/191x40.webp",
+    address: "403, 4th Floor, B-Block, The Platina, Main Road Kondapur, Gachibowli, Hyderabad, Telangana, 500032.  info@tensorgo.com",
+    contactEmail: "info@tensorgo.com",
+    contactPhone: "9121170501",
+    timezone: "Asia/Kolkata",
+    currency: "INR",
+    dateFormat: "DD/MM/YYYY",
+    timeFormat: "24h",
+    language: "en",
+  };
+
+  await prisma.setting.upsert({
+    where: { id: settingData.id },
+    update: settingData,
+    create: settingData,
+  });
+
+  console.log("✅ Settings seeded");
+
+  // ---------------- STEP 2: Leave Policies ----------------
+  const policiesData = [
+    { leaveType: LeaveType.SICK, annualQuota: 12, maxConsecutiveDays: 5, minDaysNotice: 0, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
+    { leaveType: LeaveType.VACATION, annualQuota: 20, maxConsecutiveDays: 10, minDaysNotice: 7, requiresApproval: true, requiresDocument: false, carryForwardAllowed: true, maxCarryForward: 10 },
+    { leaveType: LeaveType.LOP, annualQuota: 5, maxConsecutiveDays: 2, minDaysNotice: 3, requiresApproval: true, requiresDocument: true, carryForwardAllowed: false },
+    { leaveType: LeaveType.WFH, annualQuota: 50, maxConsecutiveDays: 5, minDaysNotice: 1, requiresApproval: true, requiresDocument: false, carryForwardAllowed: false },
+  ];
+
+  const leavePolicies = [];
+  for (const policy of policiesData) {
+    const leavePolicy = await prisma.leavePolicy.upsert({
+      where: { leaveType: policy.leaveType },
+      update: {},
+      create: policy,
+    });
+    leavePolicies.push(leavePolicy);
+  }
+
+  console.log("✅ Leave policies seeded");
+
+  // ---------------- STEP 3: Leave Balances ----------------
+  const users = await prisma.user.findMany();
+  const currentYear = new Date().getFullYear();
+
+  for (const user of users) {
+    for (const policy of leavePolicies) {
+      await prisma.leaveBalance.upsert({
+        where: {
+          userId_leavePolicyId_year: {
+            userId: user.id,
+            leavePolicyId: policy.id,
+            year: currentYear,
+          },
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          leavePolicyId: policy.id,
+          year: currentYear,
+          totalQuota: policy.annualQuota,
+          availableDays: policy.annualQuota,
+        },
+      });
+    }
+  }
+
+  console.log("✅ Leave balances seeded for all users");
+}
+
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+    console.log("🌱 Seeding completed successfully!");
+  })
+  .catch(async (e) => {
+    console.error("❌ Seeding failed:", e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
