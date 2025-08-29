@@ -15,7 +15,7 @@ const ProjectManagement: React.FC = () => {
       navigate('/app'); // redirect non-admins
     }
   }, [user, navigate]);
-
+console.log("Hi")
   const { data: projects = [], isLoading: loadingProjects, error: projectsError } = useGetProjectsQuery();
   const { data: managers = [], isLoading: loadingManagers } = useGetManagersQuery();
   const [createProject, { isLoading: creating }] = useCreateProjectMutation();
