@@ -1,6 +1,6 @@
 // src/pages/TaskManagement.tsx
 import * as React from "react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { Button } from "@/components/ui/button";
@@ -8,18 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import CreateModuleModal from "@/components/CreateModuleModal";
 import CreateTaskModal from "@/components/CreateTaskModal";
 import { useGetTasksQuery } from "@/store/api/taskApi"; // adjust import according to your setup
-import { Task } from "@/types"; // optional: define Task type for TS
+import { Task } from "@/types";
 
 export default function TaskManagement() {
   const [moduleModalOpen, setModuleModalOpen] = useState(false);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
 
-  // Fetch tasks from API
   const { data: tasks = [], refetch, isLoading } = useGetTasksQuery();
-
   const { user } = useSelector((state: RootState) => state.auth);
 
-  // refetch after modal close to update table
   const handleModuleCreated = () => {
     setModuleModalOpen(false);
     refetch();
@@ -35,8 +32,8 @@ export default function TaskManagement() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Task Management</h1>
         <div className="flex gap-2">
-          <Button onClick={() => setModuleModalOpen(true)}>Add Module</Button>
-          <Button onClick={() => setTaskModalOpen(true)}>Add Task</Button>
+          <Button onClick={() => setModuleModalOpen(true)}>Create Module</Button>
+          <Button onClick={() => setTaskModalOpen(true)}>Create Task</Button>
         </div>
       </div>
 
@@ -48,6 +45,8 @@ export default function TaskManagement() {
               <TableHead>Module</TableHead>
               <TableHead>Project</TableHead>
               <TableHead>Assigned To</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead>Allocated Hours</TableHead>
               <TableHead>Priority</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
@@ -55,15 +54,11 @@ export default function TaskManagement() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  Loading...
-                </TableCell>
+                <TableCell colSpan={8} className="text-center">Loading...</TableCell>
               </TableRow>
             ) : tasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
-                  No tasks found
-                </TableCell>
+                <TableCell colSpan={8} className="text-center">No tasks found</TableCell>
               </TableRow>
             ) : (
               tasks.map((task: Task) => (
@@ -72,6 +67,8 @@ export default function TaskManagement() {
                   <TableCell>{task.module?.name}</TableCell>
                   <TableCell>{task.module?.project?.projectName}</TableCell>
                   <TableCell>{task.assignedTo?.firstName} {task.assignedTo?.lastName}</TableCell>
+                  <TableCell>{task.description || "-"}</TableCell>
+                  <TableCell>{task.allocatedHrs}</TableCell>
                   <TableCell>{task.priority}</TableCell>
                   <TableCell>{task.status}</TableCell>
                 </TableRow>
@@ -83,12 +80,16 @@ export default function TaskManagement() {
 
       {/* Modals */}
       <CreateModuleModal
-  isOpen={moduleModalOpen} // match prop name
-  onClose={() => setModuleModalOpen(false)}
-  projectId="your-project-id"
-/>
+        isOpen={moduleModalOpen}
+        onClose={() => setModuleModalOpen(false)}
+        projectId="your-project-id"
+      />
 
-      <CreateTaskModal isOpen={taskModalOpen} onClose={() => setTaskModalOpen(false)} onCreated={handleTaskCreated} />
+      <CreateTaskModal
+        isOpen={taskModalOpen}
+        onClose={() => setTaskModalOpen(false)}
+        onCreated={() => refetch()}
+      />
     </div>
   );
 }

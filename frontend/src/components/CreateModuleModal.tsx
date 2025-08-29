@@ -11,27 +11,7 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const [moduleName, setModuleName] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const { data: projects = [], isLoading, error } = useGetProjectsQuery();
-  
-  // Better error logging
-  useEffect(() => {
-    if (error) {
-      console.error('Projects API Error:', error);
-      if ('status' in error) {
-        console.error('Error status:', error.status);
-        console.error('Error data:', error.data);
-      }
-    }
-  }, [error]);
   const [createModule] = useCreateModuleMutation();
-
-  // Debug logging - remove after fixing
-  useEffect(() => {
-    console.log('Debug Info:');
-    console.log('Projects:', projects);
-    console.log('Is Loading:', isLoading);
-    console.log('Error:', error);
-    console.log('Projects length:', projects?.length);
-  }, [projects, isLoading, error]);
 
   // default to first project when projects load
   useEffect(() => {
@@ -43,13 +23,13 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!moduleName || !selectedProjectId) return;
-    
+
     try {
       await createModule({ moduleName, projectId: selectedProjectId });
       setModuleName("");
       onClose();
-    } catch (error) {
-      console.error('Error creating module:', error);
+    } catch (err) {
+      console.error("Error creating module:", err);
     }
   };
 
@@ -60,26 +40,12 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
       <div className="bg-white p-6 rounded shadow-lg w-full max-w-md">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <h2 className="text-xl font-bold">Create Module</h2>
-          
-          <input
-            type="text"
-            placeholder="Module Name"
-            value={moduleName}
-            onChange={(e) => setModuleName(e.target.value)}
-            required
-            className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          
+
+          {/* Select Project first */}
           <div className="flex flex-col">
             <label htmlFor="project" className="mb-1 font-medium">
               Select Project
             </label>
-            
-            {/* Debug info - remove after fixing */}
-            <div className="text-xs text-gray-500 mb-2">
-              Debug: {projects?.length || 0} projects found
-            </div>
-            
             {isLoading ? (
               <p className="text-gray-500">Loading projects...</p>
             ) : error ? (
@@ -97,18 +63,28 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
                 required
-                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+               className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
+>
                 <option value="">Select a project...</option>
                 {projects.map((project: any) => (
                   <option key={project.id} value={project.id}>
-                    {project.projectName || project.name || project.title || `Project ${project.id}`}
+                    {project.projectName || project.name || `Project ${project.id}`}
                   </option>
                 ))}
               </select>
             )}
           </div>
-          
+
+          {/* Module Name */}
+          <input
+            type="text"
+            placeholder="Module Name"
+            value={moduleName}
+            onChange={(e) => setModuleName(e.target.value)}
+            required
+            className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
           <div className="flex justify-end gap-2">
             <button
               type="button"

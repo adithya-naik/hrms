@@ -1,15 +1,26 @@
+// src/components/CreateTaskModal.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import ReactDOM from "react-dom";
-import { useCreateTaskMutation, useGetModulesQuery, useGetProjectsQuery } from "../store/api/taskApi";
+import { 
+  useCreateTaskMutation, 
+  useGetModulesQuery, 
+  useGetProjectsQuery 
+} from "../store/api/taskApi";
+
+// We'll add a getUsersQuery in taskApi
+import { useGetUsersQuery } from "../store/api/taskApi";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  onCreated: () => void; // refresh table
 }
 
-const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose, onCreated }) => {
   const { data: modules = [], isLoading: loadingModules } = useGetModulesQuery();
-  const { data: projects = [], isLoading: loadingProjects } = useGetProjectsQuery(); // Get from database
+  const { data: projects = [], isLoading: loadingProjects } = useGetProjectsQuery();
+  const { data: users = [], isLoading: loadingUsers } = useGetUsersQuery();
+
   const [createTask] = useCreateTaskMutation();
 
   const [taskName, setTaskName] = useState("");
@@ -23,7 +34,7 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
   // Filter modules based on selected project
   const filteredModules = useMemo(() => {
     if (!selectedProjectId) return modules;
-    return modules.filter(module => module.projectId === selectedProjectId);
+    return modules.filter((m) => m.projectId === selectedProjectId);
   }, [modules, selectedProjectId]);
 
   // Default selections
@@ -39,30 +50,39 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
     }
   }, [filteredModules]);
 
+  useEffect(() => {
+    if (users.length > 0 && !assignedToId) {
+      setAssignedToId(users[0].id);
+    }
+  }, [users]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskName || !moduleId || !assignedToId || !allocatedHrs) return;
+    if (!taskName || !moduleId || !assignedToId) return;
 
     try {
       await createTask({
         taskName,
-        priority,
-        allocatedHrs: Number(allocatedHrs),
         moduleId,
         assignedToId,
-      });
-      
+        description,
+        priority,
+        allocatedHrs: Number(allocatedHrs) || 0,
+      }).unwrap();
+
       // Reset form
       setTaskName("");
       setDescription("");
       setSelectedProjectId(projects[0]?.id || "");
       setModuleId("");
-      setAssignedToId("");
+      setAssignedToId(users[0]?.id || "");
       setPriority("MEDIUM");
       setAllocatedHrs("");
+
+      onCreated(); // refresh table
       onClose();
     } catch (error) {
-      console.error("Error creating task:", error);
+      console.error("Failed to create task:", error);
     }
   };
 
@@ -74,24 +94,22 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <h2 className="text-xl font-bold mb-2">Create Task</h2>
 
-          {/* Row 1: Select Project and Select Module */}
+          {/* Project & Module */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col">
               <label className="mb-1 font-medium text-sm">Select Project</label>
               {loadingProjects ? (
-                <p className="text-gray-500 p-2">Loading projects...</p>
+                <p>Loading projects...</p>
               ) : (
                 <select
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
                   required
-                  className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
                 >
                   <option value="">Choose project...</option>
-                  {projects.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.projectName}
-                    </option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>{p.projectName}</option>
                   ))}
                 </select>
               )}
@@ -100,35 +118,33 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <div className="flex flex-col">
               <label className="mb-1 font-medium text-sm">Select Module</label>
               {loadingModules ? (
-                <p className="text-gray-500 p-2">Loading modules...</p>
+                <p>Loading modules...</p>
               ) : (
                 <select
                   value={moduleId}
                   onChange={(e) => setModuleId(e.target.value)}
                   required
-                  className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={!selectedProjectId || filteredModules.length === 0}
+                  className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
                 >
                   <option value="">Choose module...</option>
-                  {filteredModules.map((module) => (
-                    <option key={module.id} value={module.id}>
-                      {module.name}
-                    </option>
+                  {filteredModules.map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
                 </select>
               )}
             </div>
           </div>
 
-          {/* Row 2: Task Name and Select Assign To */}
+          {/* Task Name & Assign To */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col">
               <label className="mb-1 font-medium text-sm">Task Name</label>
               <input
                 type="text"
-                placeholder="Enter task name"
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
+                placeholder="Task name"
                 required
                 className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -136,25 +152,34 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
 
             <div className="flex flex-col">
               <label className="mb-1 font-medium text-sm">Assign To</label>
-              <input
-                type="text"
-                placeholder="Employee ID"
-                value={assignedToId}
-                onChange={(e) => setAssignedToId(e.target.value)}
-                required
-                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              {loadingUsers ? (
+                <p>Loading users...</p>
+              ) : (
+                <select
+                  value={assignedToId}
+                  onChange={(e) => setAssignedToId(e.target.value)}
+                  required
+                  className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
+                >
+                  <option value="">Select Employee</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.firstName} {u.lastName} ({u.employeeId})
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
-          {/* Row 3: Select Priority and Allocated Hours */}
+          {/* Priority & Allocated Hours */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col">
               <label className="mb-1 font-medium text-sm">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
               >
                 <option value="LOW">LOW</option>
                 <option value="MEDIUM">MEDIUM</option>
@@ -167,42 +192,41 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose }) => {
               <label className="mb-1 font-medium text-sm">Allocated Hours</label>
               <input
                 type="number"
-                placeholder="Hours (e.g., 8)"
                 value={allocatedHrs}
                 onChange={(e) => setAllocatedHrs(e.target.value)}
+                placeholder="Hours"
                 min="0"
                 step="0.5"
-                required
                 className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
 
-          {/* Optional Description */}
+          {/* Description */}
           <div className="flex flex-col">
             <label className="mb-1 font-medium text-sm">Description (Optional)</label>
             <textarea
-              placeholder="Task description..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              placeholder="Task description"
               rows={3}
               className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
           </div>
 
-          {/* Action Buttons */}
+          {/* Actions */}
           <div className="flex justify-end gap-2 mt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!taskName || !moduleId || !assignedToId || !allocatedHrs}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              disabled={!taskName || !moduleId || !assignedToId}
+              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Create Task
             </button>
