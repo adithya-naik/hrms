@@ -1,14 +1,12 @@
 // src/components/CreateTaskModal.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState } from "react";
 import ReactDOM from "react-dom";
 import { 
   useCreateTaskMutation, 
   useGetModulesQuery, 
-  useGetProjectsQuery 
+  useGetProjectsQuery, 
+  useGetUsersQuery 
 } from "../store/api/taskApi";
-
-// We'll add a getUsersQuery in taskApi
-import { useGetUsersQuery } from "../store/api/taskApi";
 
 interface Props {
   isOpen: boolean;
@@ -31,31 +29,6 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose, onCreated }) => {
   const [priority, setPriority] = useState("MEDIUM");
   const [allocatedHrs, setAllocatedHrs] = useState("");
 
-  // Filter modules based on selected project
-  const filteredModules = useMemo(() => {
-    if (!selectedProjectId) return modules;
-    return modules.filter((m) => m.projectId === selectedProjectId);
-  }, [modules, selectedProjectId]);
-
-  // Default selections
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
-    }
-  }, [projects]);
-
-  useEffect(() => {
-    if (filteredModules.length > 0 && !moduleId) {
-      setModuleId(filteredModules[0].id);
-    }
-  }, [filteredModules]);
-
-  useEffect(() => {
-    if (users.length > 0 && !assignedToId) {
-      setAssignedToId(users[0].id);
-    }
-  }, [users]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskName || !moduleId || !assignedToId) return;
@@ -73,9 +46,9 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose, onCreated }) => {
       // Reset form
       setTaskName("");
       setDescription("");
-      setSelectedProjectId(projects[0]?.id || "");
+      setSelectedProjectId("");
       setModuleId("");
-      setAssignedToId(users[0]?.id || "");
+      setAssignedToId("");
       setPriority("MEDIUM");
       setAllocatedHrs("");
 
@@ -124,11 +97,11 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose, onCreated }) => {
                   value={moduleId}
                   onChange={(e) => setModuleId(e.target.value)}
                   required
-                  disabled={!selectedProjectId || filteredModules.length === 0}
+                  disabled={modules.length === 0}
                   className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
                 >
                   <option value="">Choose module...</option>
-                  {filteredModules.map((m) => (
+                  {modules.map((m) => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
                 </select>
@@ -161,7 +134,7 @@ const CreateTaskModal: React.FC<Props> = ({ isOpen, onClose, onCreated }) => {
                   required
                   className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
                 >
-                  <option value="">Select Employee</option>
+                  <option value="">Select employee...</option>
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.firstName} {u.lastName} ({u.employeeId})

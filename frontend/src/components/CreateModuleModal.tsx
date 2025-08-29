@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+// src/components/CreateModuleModal.tsx
+import React, { useState } from "react";
 import ReactDOM from "react-dom";
 import { useCreateModuleMutation, useGetProjectsQuery } from "../store/api/taskApi";
 
@@ -13,20 +14,14 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { data: projects = [], isLoading, error } = useGetProjectsQuery();
   const [createModule] = useCreateModuleMutation();
 
-  // default to first project when projects load
-  useEffect(() => {
-    if (projects.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(projects[0].id);
-    }
-  }, [projects, selectedProjectId]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!moduleName || !selectedProjectId) return;
 
     try {
-      await createModule({ moduleName, projectId: selectedProjectId });
+      await createModule({ moduleName, projectId: selectedProjectId }).unwrap();
       setModuleName("");
+      setSelectedProjectId(""); // reset selection
       onClose();
     } catch (err) {
       console.error("Error creating module:", err);
@@ -41,7 +36,7 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <h2 className="text-xl font-bold">Create Module</h2>
 
-          {/* Select Project first */}
+          {/* Select Project */}
           <div className="flex flex-col">
             <label htmlFor="project" className="mb-1 font-medium">
               Select Project
@@ -49,13 +44,8 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
             {isLoading ? (
               <p className="text-gray-500">Loading projects...</p>
             ) : error ? (
-              <div className="text-red-500">
-                <p>Error loading projects:</p>
-                <pre className="text-xs mt-1 bg-red-50 p-2 rounded overflow-auto">
-                  {JSON.stringify(error, null, 2)}
-                </pre>
-              </div>
-            ) : projects?.length === 0 ? (
+              <p className="text-red-500">Error loading projects</p>
+            ) : projects.length === 0 ? (
               <p className="text-orange-500">No projects available. Please create a project first.</p>
             ) : (
               <select
@@ -63,8 +53,8 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 value={selectedProjectId}
                 onChange={(e) => setSelectedProjectId(e.target.value)}
                 required
-               className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
->
+                className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-black"
+              >
                 <option value="">Select a project...</option>
                 {projects.map((project: any) => (
                   <option key={project.id} value={project.id}>
@@ -85,6 +75,7 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
             className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
+          {/* Actions */}
           <div className="flex justify-end gap-2">
             <button
               type="button"
@@ -95,7 +86,7 @@ const CreateModuleModal: React.FC<Props> = ({ isOpen, onClose }) => {
             </button>
             <button
               type="submit"
-              disabled={!moduleName || !selectedProjectId || projects?.length === 0}
+              disabled={!moduleName || !selectedProjectId || projects.length === 0}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Create
