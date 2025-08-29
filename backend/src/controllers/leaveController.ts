@@ -1,15 +1,44 @@
-import type { Response, NextFunction, Express } from "express"
-import { z } from "zod"
-import { prisma } from "../lib/prisma"
-import { createError } from "../middleware/errorHandler"
-import type { AuthRequest } from "../middleware/auth"
-import { LeaveType, LeaveStatus, UserRole } from "@prisma/client"
-import { sendEmail, emailTemplates } from "../lib/email"
-import { logger } from "../utils/logger"
-import multer from "multer"
-import path from "path"
-import { safeDate } from "../utils/date"
-import { format } from "date-fns"
+import type { Response, NextFunction, Express } from "express";
+import { z } from "zod";
+import { prisma } from "../lib/prisma";
+import { createError } from "../middleware/errorHandler";
+import type { AuthRequest } from "../middleware/auth";
+import { LeaveType, LeaveStatus, UserRole } from "@prisma/client";
+import { format, addDays as dateFnsAddDays, isSameDay } from "date-fns";
+import { logger } from "../utils/logger";
+import multer from "multer";
+import path from "path";
+import { safeDate } from "../utils/date";
+import { sendEmail, emailTemplates } from "../lib/email";
+
+// List of public holidays for 2025
+const PUBLIC_HOLIDAYS_2025 = [
+  new Date(2025, 0, 1),   // New Year Day
+  new Date(2025, 0, 14),  // Sankranti
+  new Date(2025, 1, 26),  // Maha Shivaratri
+  new Date(2025, 2, 14),  // Holi
+  new Date(2025, 7, 15),  // Independence Day
+  new Date(2025, 7, 27),  // Ganesh Chaturthi
+  new Date(2025, 9, 2),   // Dussera
+  new Date(2025, 9, 20),  // Deepavali
+  new Date(2025, 9, 21),  // Govardhan Puja
+  new Date(2025, 11, 25)  // Christmas
+].map(date => new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+
+/**
+ * Checks if a given date is a public holiday or Sunday
+ */
+function isHolidayOrSunday(date: Date): boolean {
+  // Check if it's Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  if (date.getDay() === 0) return true;
+  
+  // Check if it's a public holiday
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  return PUBLIC_HOLIDAYS_2025.some(holiday => 
+    isSameDay(holiday, dateOnly)
+  );
+}
+
 // Utility: Add days to a Date object
 function addDays(date: Date, days: number) {
   const result = new Date(date)
@@ -161,11 +190,13 @@ class LeaveController {
       const policy = await prisma.leavePolicy.findUnique({ where: { leaveType: data.leaveType } })
       if (!policy) throw new Error("Leave policy not found")
 
+      // Calculate leave distribution (regular days vs LOP)
       const { regularDays, lopDays, isLOP } = await this.calculateLeaveDistribution(
         userId,
         data.leaveType,
         totalDays,
         data.startDate.getFullYear(),
+        data.startDate // Pass startDate to get correct month
       )
 
       // 1️⃣ Create main leave
@@ -353,6 +384,7 @@ class LeaveController {
           leave.leaveType,
           leave.totalDays,
           leave.startDate.getFullYear(),
+          leave.startDate // Pass startDate
         )
       })
 
@@ -511,6 +543,7 @@ class LeaveController {
             leave.leaveType,
             leave.totalDays,
             leave.startDate.getFullYear(),
+            leave.startDate // Pass startDate
           )
         }
         // If leave was pending, no balance changes were made, so nothing to restore
@@ -835,41 +868,100 @@ class LeaveController {
     leaveType: LeaveType,
     totalDays: number,
     year: number,
+    startDate?: Date,
   ): Promise<{ regularDays: number; lopDays: number; isLOP: boolean }> {
-    // LOP leaves are always LOP
-    if (leaveType === LeaveType.LOP) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
+    // Handle special leave types first
+    switch (leaveType) {
+      case LeaveType.LOP:
+        return { regularDays: 0, lopDays: totalDays, isLOP: true };
+      case LeaveType.WFH:
+      case LeaveType.CASUAL: // Treat casual leave same as WFH - never LOP
+        return { regularDays: totalDays, lopDays: 0, isLOP: false };
+      // Continue with other leave types
     }
 
-    const leavePolicyId = await this.getLeavePolicyId(leaveType)
+    const leavePolicyId = await this.getLeavePolicyId(leaveType);
     if (!leavePolicyId) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
-    }
-const month = new Date().getMonth() + 1
-    const balance = await prisma.leaveBalance.findUnique({
-      where: {
-         userId_leavePolicyId_year_month: {
-          userId,
-          leavePolicyId,
-          year,
-          month,
-        },
-      },
-    })
-
-    if (!balance) {
-      return { regularDays: 0, lopDays: totalDays, isLOP: true }
+      logger.warn(`No active policy found for leave type: ${leaveType}`);
+      return { regularDays: 0, lopDays: totalDays, isLOP: true };
     }
 
-    // Calculate how many days can be taken from regular quota
-    const availableRegularDays = Math.max(0, balance.availableDays)
-    const regularDays = Math.min(totalDays, availableRegularDays)
-    const lopDays = Math.max(0, totalDays - regularDays)
+    try {
+      // For casual leave, always check the balance but don't mark as LOP
+      if (leaveType === LeaveType.CASUAL) {
+        const balance = await this.getOrCreateBalance(userId, leavePolicyId, year, startDate);
+        if (balance.availableDays < totalDays) {
+          logger.warn(`Insufficient casual leave balance: ${balance.availableDays} available, ${totalDays} requested`);
+          // For casual leave, we still don't mark as LOP, but we should probably handle this case
+          // For now, we'll allow it but log a warning
+        }
+        return { regularDays: totalDays, lopDays: 0, isLOP: false };
+      }
 
-    return {
-      regularDays,
-      lopDays,
-      isLOP: lopDays > 0,
+      // For other leave types, proceed with normal balance checking
+      let balance = null;
+      if (startDate) {
+        const month = startDate.getMonth() + 1;
+        balance = await prisma.leaveBalance.findUnique({
+          where: {
+            userId_leavePolicyId_year_month: {
+              userId,
+              leavePolicyId,
+              year,
+              month,
+            },
+          },
+        });
+        logger.info(`Monthly balance for ${leaveType} (month ${month}): ${JSON.stringify(balance)}`);
+      }
+
+      // If no monthly balance found, try to find annual balance
+      if (!balance) {
+        balance = await prisma.leaveBalance.findFirst({
+          where: {
+            userId,
+            leavePolicyId,
+            year,
+            month: 0, // Annual balance
+          },
+        });
+        logger.info(`Annual balance for ${leaveType}: ${JSON.stringify(balance)}`);
+      }
+
+      if (!balance) {
+        logger.warn(`No leave balance found for user ${userId}, policy ${leavePolicyId}, year ${year}`);
+        return { regularDays: 0, lopDays: totalDays, isLOP: true };
+      }
+
+      // Calculate available days, ensuring we don't go negative
+      const availableDays = Math.max(0, balance.availableDays);
+      logger.info(`Available days for ${leaveType}: ${availableDays}, Requested: ${totalDays}`);
+      
+      // If available days is 0, all days are LOP
+      if (availableDays <= 0) {
+        return { regularDays: 0, lopDays: totalDays, isLOP: true };
+      }
+      
+      // If we have enough balance, all days are regular
+      if (availableDays >= totalDays) {
+        return { regularDays: totalDays, lopDays: 0, isLOP: false };
+      }
+      
+      // Otherwise, use available balance for regular days and remaining as LOP
+      return {
+        regularDays: availableDays,
+        lopDays: totalDays - availableDays,
+        isLOP: true
+      };
+    } catch (error) {
+      logger.error(`Error calculating leave distribution: ${error}`);
+      // In case of error, be conservative and mark as LOP
+      // (WFH is already handled at the start of the function)
+      return { 
+        regularDays: 0,
+        lopDays: totalDays,
+        isLOP: true
+      };
     }
   }
 
@@ -879,8 +971,22 @@ const month = new Date().getMonth() + 1
     leaveType: LeaveType,
     totalDays: number,
     year: number,
+    startDate?: Date,
   ) {
-    const { regularDays, lopDays } = await this.calculateLeaveDistribution(userId, leaveType, totalDays, year)
+    // For casual leave, always use the full amount from the casual leave balance
+    if (leaveType === LeaveType.CASUAL) {
+      await this.updateSpecificLeaveBalance(tx, userId, leaveType, totalDays, "approve", year)
+      return
+    }
+    
+    // For other leave types, calculate regular vs LOP days
+    const { regularDays, lopDays } = await this.calculateLeaveDistribution(
+      userId, 
+      leaveType, 
+      totalDays, 
+      year,
+      startDate
+    )
 
     // Update regular leave balance if any regular days are used
     if (regularDays > 0 && leaveType !== LeaveType.LOP) {
@@ -899,8 +1005,15 @@ const month = new Date().getMonth() + 1
     leaveType: LeaveType,
     totalDays: number,
     year: number,
+    startDate?: Date,
   ) {
-    const { regularDays, lopDays } = await this.calculateLeaveDistribution(userId, leaveType, totalDays, year)
+    const { regularDays, lopDays } = await this.calculateLeaveDistribution(
+      userId, 
+      leaveType, 
+      totalDays, 
+      year,
+      startDate
+    )
 
     // Restore regular leave balance if any regular days were used
     if (regularDays > 0 && leaveType !== LeaveType.LOP) {
@@ -929,17 +1042,36 @@ const month = new Date().getMonth() + 1
         throw new Error(`No leave policy found for leave type: ${leaveType}`)
       }
 
-      let balance = await tx.leaveBalance.findUnique({
+      // First try to find the exact balance record
+      let balance = await tx.leaveBalance.findFirst({
         where: {
-          userId_leavePolicyId_year_month: {
-            userId,
-            leavePolicyId,
-            year,
-            month: new Date().getMonth() + 1,
-          },
+          userId,
+          leavePolicyId,
+          year,
+          // First try to find a monthly balance if it's not LOP
+          ...(leaveType !== LeaveType.LOP ? { month: { not: 0 } } : {})
         },
+        orderBy: {
+          // Prefer monthly over annual balance
+          month: 'desc' as const
+        }
       })
 
+      // If no monthly balance found, try annual balance
+      if (!balance) {
+        balance = await tx.leaveBalance.findUnique({
+          where: {
+            userId_leavePolicyId_year_month: {
+              userId,
+              leavePolicyId,
+              year,
+              month: 0, // Annual balance
+            },
+          },
+        })
+      }
+
+      // If still no balance record exists, create one
       if (!balance) {
         const policy = await tx.leavePolicy.findUnique({
           where: { id: leavePolicyId },
@@ -954,12 +1086,10 @@ const month = new Date().getMonth() + 1
             userId,
             leavePolicyId,
             year,
-            month: new Date().getMonth() + 1,
             totalQuota: policy.annualQuota,
             usedDays: 0,
             pendingDays: 0,
             availableDays: policy.annualQuota,
-            resetDate: new Date(),
           },
         })
 
@@ -970,39 +1100,36 @@ const month = new Date().getMonth() + 1
       let nextAvail = balance.availableDays
 
       logger.info(`🔄 Balance update: user=${userId}, type=${leaveType}, action=${action}, days=${days}`)
-      logger.info(`📊 Before: used=${balance.usedDays}, available=${balance.availableDays}`)
+      logger.info(`📊 Before - Used: ${balance.usedDays}, Available: ${balance.availableDays}, Total: ${balance.totalQuota}`)
 
-      switch (action) {
-        case "approve":
-          nextUsed = balance.usedDays + days
-          nextAvail = Math.max(0, balance.availableDays - days)
-          break
-        case "cancel":
-          nextUsed = Math.max(0, balance.usedDays - days)
-          nextAvail = balance.availableDays + days
-          break
+      // Calculate new values
+      let newUsedDays = balance.usedDays;
+      let newAvailableDays = balance.availableDays;
+
+      if (action === "approve") {
+        // When approving, move days from pending to used
+        newUsedDays = balance.usedDays + days;
+        newAvailableDays = Math.max(0, balance.availableDays - days);
+      } else {
+        // When cancelling, move days from used back to available
+        newUsedDays = Math.max(0, balance.usedDays - days);
+        newAvailableDays = balance.availableDays + days;
       }
 
-      // Ensure values don't go negative
-      nextUsed = Math.max(0, nextUsed)
-      nextAvail = Math.max(0, nextAvail)
-const month = new Date().getMonth() + 1
-      await tx.leaveBalance.update({
-        where: {
-          userId_leavePolicyId_year_month: {
-            userId,
-            leavePolicyId,
-            year,
-            month,
-          },
-        },
-        data: {
-          usedDays: nextUsed,
-          availableDays: nextAvail,
-        },
-      })
+      // Ensure we don't exceed total quota
+      newAvailableDays = Math.min(newAvailableDays, balance.totalQuota);
 
-      logger.info(`📊 After: used=${nextUsed}, available=${nextAvail}`)
+      logger.info(`📊 After - Used: ${newUsedDays}, Available: ${newAvailableDays}, Total: ${balance.totalQuota}`);
+
+      // Update the balance
+      await tx.leaveBalance.update({
+        where: { id: balance.id },
+        data: {
+          usedDays: newUsedDays,
+          availableDays: newAvailableDays,
+        },
+      });
+
       logger.info(`✅ Balance updated successfully for user ${userId} | ${leaveType} | ${action} | days: ${days}`)
     } catch (error) {
       logger.error(`❌ Failed to update leave balance: ${error}`)
@@ -1040,13 +1167,31 @@ const month = new Date().getMonth() + 1
   }
 
   private calculateLeaveDays(startDate: Date, endDate: Date, isHalfDay: boolean): number {
-    if (isHalfDay) return 0.5
-    const msPerDay = 1000 * 60 * 60 * 24
-    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()
-    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
-    if (end < start) return 0
-    const diffDays = Math.floor((end - start) / msPerDay) + 1
-    return diffDays
+    if (isHalfDay) return 0.5;
+    
+    // Create date objects without time components
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    
+    if (end < start) return 0;
+    
+    let workingDays = 0;
+    let currentDate = new Date(start);
+    
+    // Iterate through each day in the range
+    while (currentDate <= end) {
+      // Only count weekdays (1-5) that are not public holidays
+      if (!isHolidayOrSunday(currentDate)) {
+        workingDays++;
+      } else {
+        logger.info(`Excluding holiday/weekend: ${currentDate.toDateString()}`);
+      }
+      
+      // Move to next day using date-fns addDays to handle month/year transitions
+      currentDate = dateFnsAddDays(currentDate, 1);
+    }
+    
+    return workingDays;
   }
 
   private async getLeavePolicyId(leaveType: LeaveType): Promise<string> {
