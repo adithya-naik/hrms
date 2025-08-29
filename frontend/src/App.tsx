@@ -24,6 +24,7 @@ import { useNotificationsSSE } from "@/hooks/useNotificationsSSE";
 import NotificationsPage from './pages/NotificationsPage';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TaskManagement from '@/pages/TaskManagement';
+import TaskList from "@/pages/TaskList";
 
 
 const queryClient = new QueryClient();
@@ -146,6 +147,15 @@ const App = () => (
                       </ProtectedRoute>
                   }
                  />
+                 
+                 <Route
+                    path="my-tasks"
+                    element={
+                       <ProtectedRoute roles={['EMPLOYEE']}>
+                            <TaskList />
+                        </ProtectedRoute>
+                    }
+                   />
 
               {/* My Profile */}
               <Route path="/app/me" element={<ProfilePage />} />

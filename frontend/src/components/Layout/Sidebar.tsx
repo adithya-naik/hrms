@@ -29,8 +29,9 @@ const navigation = [
   { name: "Reports", href: "/app/reports", icon: BarChart3, roles: ["HR", "ADMIN"] },
   { name: "Users", href: "/app/users", icon: Users, roles: ["HR", "ADMIN"] },
   { name: "Settings", href: "/app/settings", icon: Settings, roles: ["ADMIN"] },
-  { name: "Project Management", href: "/app/projects", icon: FileText, roles: ["ADMIN"] }, // ✅ Add this
-  { name: "Task Management", href: "/app/tasks", icon: FileText, roles: ["MANAGER"] },
+  { name: "Project Management", href: "/app/projects", icon: FileText, roles: ["ADMIN"] },
+  { name: "Task Management", href: "/app/tasks", icon: FileText, roles: ["MANAGER"] },  // ✅ Manager side
+  { name: "My Tasks", href: "/app/my-tasks", icon: FileText, roles: ["EMPLOYEE"] },     // ✅ Employee side
   { name: "My Profile", href: "/app/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "Notifications", href: "/app/notifications", icon: Bell, roles: ["EMPLOYEE", "MANAGER", "HR"] },
 ];

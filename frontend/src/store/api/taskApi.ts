@@ -76,6 +76,10 @@ export const taskApi = createApi({
       invalidatesTags: ["Tasks"],
     }),
 
+    getEmployeeTasks: builder.query<any[], void>({
+  query: () => "/tasks/my-tasks", // backend should return tasks for logged-in employee
+}),
+
     // Users (for dropdown)
     getUsers: builder.query<User[], void>({
       query: () => "/users",
@@ -91,5 +95,6 @@ export const {
   useCreateModuleMutation,
   useGetProjectsQuery,
   useCreateProjectMutation,
-  useGetUsersQuery, // <-- Add this
+  useGetUsersQuery, 
+  useGetEmployeeTasksQuery,// <-- Add this
 } = taskApi;
