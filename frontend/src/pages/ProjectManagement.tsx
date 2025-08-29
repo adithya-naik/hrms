@@ -15,7 +15,6 @@ const ProjectManagement: React.FC = () => {
       navigate('/app'); // redirect non-admins
     }
   }, [user, navigate]);
-console.log("Hi")
   const { data: projects = [], isLoading: loadingProjects, error: projectsError } = useGetProjectsQuery();
   const { data: managers = [], isLoading: loadingManagers } = useGetManagersQuery();
   const [createProject, { isLoading: creating }] = useCreateProjectMutation();
@@ -64,7 +63,7 @@ console.log("Hi")
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Project Management (Admin Only)</h1>
+      <h1 className="text-2xl font-bold mb-4">Project Management</h1>
 
       {/* Create Project Form */}
       <div className="mb-6 space-y-4">

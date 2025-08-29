@@ -36,6 +36,7 @@ model User {
   manager        User?          @relation("ManagerEmployee", fields: [managerId], references: [id])
   employees      User[]         @relation("ManagerEmployee")
   projects       Project[]
+  tasks          Task[]         @relation("UserTasks")
   @@map("users")
 }
 
@@ -152,7 +153,7 @@ model Holiday {
 
 model Project {
   id             String   @id @default(cuid())
-  projectName    String
+  projectName    String   @unique        // ← make unique for upsert
   clientName     String
   revenue        Float?
   managerId      String
@@ -160,10 +161,56 @@ model Project {
   allocatedHours Int?
   description    String?
   createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime @default(now()) @updatedAt
 
   manager        User     @relation(fields: [managerId], references: [id])
+  modules        Module[]
 }
+
+model Module {
+  id        String   @id @default(cuid())
+  name      String   @unique        // ← make unique for upsert
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  name          String       @unique        // ← make unique for upsert
+  description   String?
+  priority      TaskPriority @default(MEDIUM)
+  allocatedHrs  Int
+  status        TaskStatus   @default(PENDING)
+
+  moduleId      String
+  module        Module       @relation(fields: [moduleId], references: [id])
+
+  assignedToId  String
+  assignedTo    User         @relation("UserTasks", fields: [assignedToId], references: [id])
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  BLOCKED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+
 
 model Setting {
   id           String   @id @default(cuid())
