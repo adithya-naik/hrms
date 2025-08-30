@@ -2,7 +2,7 @@
 "use client"
 
 import { useState } from 'react'
-import { format, addDays } from 'date-fns'
+import { format, addDays, isWeekend, parseISO } from 'date-fns'
 import { toast } from "sonner"
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,23 +17,48 @@ interface DayWiseApprovalProps {
   onUpdate?: () => void
 }
 
-// Move getDateRange function outside the component or declare it before useState
-const getDateRange = (startDate: string, endDate: string) => {
-  const dates = []
+// Hardcoded list of public holidays for 2025 (format: 'YYYY-MM-DD')
+const HOLIDAYS_2025 = [
+  '2025-01-01', // New Year Day
+  '2025-01-14', // Sankranti
+  '2025-02-26', // Maha Shivaratri
+  '2025-03-14', // Holi
+  '2025-08-15', // Independence Day
+  '2025-08-27', // Ganesh Chaturthi
+  '2025-10-02', // Dussera
+  '2025-10-20', // Deepavali
+  '2025-10-21', // Govardhan Puja
+  '2025-12-25'  // Christmas
+]
+
+// Helper to check if a date is a Sunday
+const isSunday = (date: Date): boolean => {
+  return date.getDay() === 0 // 0 = Sunday
+}
+
+// Get date range excluding Sundays and public holidays
+const getWorkingDays = (startDate: string, endDate: string): string[] => {
+  const dates: string[] = []
   const start = new Date(startDate)
   const end = new Date(endDate)
   
   for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-    dates.push(format(date, 'yyyy-MM-dd'))
+    const dateStr = format(date, 'yyyy-MM-dd')
+    // Only exclude Sundays and holidays, keep Saturdays
+    if (!isSunday(date) && !HOLIDAYS_2025.includes(dateStr)) {
+      dates.push(dateStr)
+    }
   }
   return dates
 }
 
 export default function DayWiseApproval({ leave, onUpdate }: DayWiseApprovalProps) {
   const [dayStatuses, setDayStatuses] = useState(() => {
-    // Now getDateRange is available
-    const dateRange = getDateRange(leave.startDate, leave.endDate)
-    return dateRange.map(date => {
+    // Get working days (exclude Sundays and public holidays)
+    const workingDays = getWorkingDays(leave.startDate, leave.endDate)
+    
+    // Initialize statuses for working days only
+    return workingDays.map(date => {
       const existing = leave.dayStatuses?.find((ds: any) => 
         format(new Date(ds.date), 'yyyy-MM-dd') === date
       )
@@ -113,9 +138,14 @@ export default function DayWiseApproval({ leave, onUpdate }: DayWiseApprovalProp
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div><strong>Type:</strong> {leave.leaveType}</div>
           <div><strong>Duration:</strong> {format(new Date(leave.startDate), 'MMM dd')} - {format(new Date(leave.endDate), 'MMM dd, yyyy')}</div>
-          <div><strong>Total Days:</strong> {leave.totalDays}</div>
+          <div><strong>Total Days:</strong> {leave.totalDays} (excluding Sundays and public holidays)</div>
           <div><strong>Reason:</strong> {leave.reason}</div>
         </div>
+        {leave.holidays?.length > 0 && (
+          <div className="mt-2 text-xs text-gray-500">
+            <strong>Note:</strong> Public holidays during this period are automatically excluded
+          </div>
+        )}
       </div>
 
       {/* Day-wise Grid */}

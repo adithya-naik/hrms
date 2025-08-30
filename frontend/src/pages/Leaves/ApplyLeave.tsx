@@ -93,27 +93,51 @@ export default function ApplyLeave() {
     }
   }, [watchedLeaveType, watchedStartDate, watchedEndDate, form])
 
+  // Hardcoded list of public holidays for 2025 (format: 'YYYY-MM-DD')
+  const HOLIDAYS_2025 = [
+    '2025-01-01', // New Year Day
+    '2025-01-14', // Sankranti
+    '2025-02-26', // Maha Shivaratri
+    '2025-03-14', // Holi
+    '2025-08-15', // Independence Day
+    '2025-08-27', // Ganesh Chaturthi
+    '2025-10-02', // Dussera
+    '2025-10-20', // Deepavali
+    '2025-10-21', // Govardhan Puja
+    '2025-12-25'  // Christmas
+  ];
+
+  const formatDate = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const isHoliday = (date: Date): boolean => {
+    return HOLIDAYS_2025.includes(formatDate(date));
+  };
+
+  const isSunday = (date: Date): boolean => {
+    return date.getDay() === 0; // 0 = Sunday
+  };
+
   // ---------------- Calculate Days ----------------
   const calculateDays = () => {
-    if (!watchedStartDate || !watchedEndDate) return 0
-    let diffDays = differenceInCalendarDays(watchedEndDate, watchedStartDate) + 1
-    if (watchedIsHalfDay) diffDays = 0.5
-
-    // Cap at monthly available leave
-    if (watchedLeaveType && balancesData?.balances) {
-      const balance = balancesData.balances.find(
-        (b: any) => b.leavePolicy?.leaveType === watchedLeaveType
-      )
-      if (balance) {
-        const monthlyQuota = balance.leavePolicy?.monthlyQuota ?? Math.ceil(balance.totalQuota / 12)
-        const usedThisMonth = balance.usedThisMonth ?? 0
-        const availableMonthly = monthlyQuota - usedThisMonth
-        if (diffDays > availableMonthly) diffDays = availableMonthly
+    if (!watchedStartDate || !watchedEndDate) return 0;
+    
+    let workingDays = 0;
+    const currentDate = new Date(watchedStartDate);
+    const endDate = new Date(watchedEndDate);
+    
+    // Count working days (excluding Sundays and holidays)
+    while (currentDate <= endDate) {
+      if (!isSunday(currentDate) && !isHoliday(currentDate)) {
+        workingDays++;
       }
+      currentDate.setDate(currentDate.getDate() + 1);
     }
-
-    return diffDays
-  }
+    
+    // If it's a half day, return 0.5, otherwise return the count of working days
+    return watchedIsHalfDay ? 0.5 : workingDays;
+  };
 
   const totalRequestedDays = calculateDays()
 
