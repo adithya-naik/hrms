@@ -25,7 +25,9 @@ import NotificationsPage from './pages/NotificationsPage';
 import ProjectManagement from '@/pages/ProjectManagement';
 import TaskManagement from '@/pages/TaskManagement';
 import TaskList from "@/pages/TaskList";
-
+import TimesheetEmployee from "@/pages/TimesheetEmployee";
+import TimesheetManager from './pages/timesheetManager';
+import TimesheetHR from './pages/TimesheetHr';
 
 const queryClient = new QueryClient();
 const NotificationsSSEInitializer = () => {
@@ -156,6 +158,35 @@ const App = () => (
                         </ProtectedRoute>
                     }
                    />
+                    
+
+                    <Route
+                        path="timesheet"
+                        element={
+                           <ProtectedRoute roles={['EMPLOYEE']}>
+                               <TimesheetEmployee />
+                            </ProtectedRoute>
+                          }
+                    />
+
+                    <Route
+  path="timesheet-manager"
+  element={
+    <ProtectedRoute roles={['MANAGER']}>
+      <TimesheetManager />
+    </ProtectedRoute>
+  }
+/>
+
+
+<Route
+  path="timesheet-hr"
+  element={
+    <ProtectedRoute roles={['HR']}>
+      <TimesheetHR />
+    </ProtectedRoute>
+  }
+/>
 
               {/* My Profile */}
               <Route path="/app/me" element={<ProfilePage />} />

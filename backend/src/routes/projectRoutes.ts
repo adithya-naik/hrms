@@ -5,7 +5,7 @@ import { authMiddleware, authorize, AuthRequest } from "../middleware/auth";
 const router = Router();
 
 // -------------------- Get all projects --------------------
-router.get("/", authMiddleware, authorize(["ADMIN", "MANAGER"]), async (req: AuthRequest, res: Response) => {
+router.get("/", authMiddleware, authorize(["ADMIN", "MANAGER", "HR"]), async (req: AuthRequest, res: Response) => {
   try {
     const projects = await prisma.project.findMany({
       include: {

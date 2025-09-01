@@ -11,6 +11,10 @@ import { logger } from './utils/logger';
 import projectRoutes from "./routes/projectRoutes";
 import moduleRoutes from "./routes/moduleRoutes";
 import taskRoutes from "./routes/taskRoutes";
+import timesheetRoutes from "./routes/timesheetRoutes";
+import managerTimesheetRoutes from "./routes/managerTimesheetRoutes";
+import employeeRoutes from "./routes/employeeRoutes";
+import hrRoutes from "./routes/hrRoutes";
 import 'express-async-errors';
 import { startLeaveReminderJob } from "./jobs/leaveReminderJob"
 import dotenv from 'dotenv';
@@ -63,11 +67,17 @@ app.get('/health', (req, res) => {
 });
 
 // ---------------- API routes ----------------
-app.use('/api', routes);
 
 app.use("/api/projects", projectRoutes);
 app.use("/api/modules", moduleRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/timesheets", timesheetRoutes);
+app.use("/api/manager/timesheets", managerTimesheetRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/hr", hrRoutes);
+
+
+app.use('/api', routes);
 // ---------------- Error handling ----------------
 app.use(errorHandler);
 

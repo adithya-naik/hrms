@@ -8,6 +8,7 @@ import { departmentApi } from './api/departmentApi';
 import { notificationApi } from "./api/notificationApi";
 import { projectApi } from './api/projectApi'; // ✅ import projectApi
 import { taskApi } from './api/taskApi';
+import { timesheetApi } from "./api/timesheetApi";
 
 import authReducer from './slices/authSlice';
 
@@ -22,7 +23,8 @@ export const store = configureStore({
     [departmentApi.reducerPath]: departmentApi.reducer,
     [notificationApi.reducerPath]: notificationApi.reducer,
     [projectApi.reducerPath]: projectApi.reducer,
-    [taskApi.reducerPath]: taskApi.reducer, // ✅ add projectApi reducer
+    [taskApi.reducerPath]: taskApi.reducer,
+    [timesheetApi.reducerPath]: timesheetApi.reducer, // ✅ add projectApi reducer
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -38,7 +40,8 @@ export const store = configureStore({
       departmentApi.middleware,
       notificationApi.middleware,
       projectApi.middleware,
-      taskApi.middleware, // ✅ add projectApi middleware
+      taskApi.middleware,
+      timesheetApi.middleware, // ✅ add projectApi middleware
     ),
 });
 

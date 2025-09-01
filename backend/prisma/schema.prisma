@@ -37,6 +37,8 @@ model User {
   employees      User[]         @relation("ManagerEmployee")
   projects       Project[]
   tasks          Task[]         @relation("UserTasks")
+  timesheets     Timesheet[]
+
   @@map("users")
 }
 
@@ -57,7 +59,7 @@ model LeavePolicy {
   id                  String         @id @default(cuid())
   leaveType           LeaveType      @unique
   annualQuota         Int
-  monthlyQuota        Int            // NEW
+  monthlyQuota        Int // NEW
   quotaResetDay       Int            @default(1) // NEW
   maxConsecutiveDays  Int?
   minDaysNotice       Int            @default(1)
@@ -73,7 +75,6 @@ model LeavePolicy {
 
   @@map("leave_policies")
 }
-
 
 model Leave {
   id               String           @id @default(cuid())
@@ -121,13 +122,13 @@ model LeaveBalance {
   userId        String
   leavePolicyId String
   year          Int
-  month         Int         // NEW
+  month         Int // NEW
   totalQuota    Int
   usedDays      Float       @default(0)
   pendingDays   Float       @default(0)
   availableDays Float
   carryForward  Float       @default(0)
-  resetDate     DateTime    // NEW
+  resetDate     DateTime // NEW
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   leavePolicy   LeavePolicy @relation("LeavePolicyToBalances", fields: [leavePolicyId], references: [id], onDelete: Cascade)
@@ -150,10 +151,9 @@ model Holiday {
   @@map("holidays")
 }
 
-
 model Project {
   id             String   @id @default(cuid())
-  projectName    String   @unique        // ← make unique for upsert
+  projectName    String   @unique // ← make unique for upsert
   clientName     String
   revenue        Float?
   managerId      String
@@ -163,15 +163,16 @@ model Project {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 
-  manager        User     @relation(fields: [managerId], references: [id])
-  modules        Module[]
+  manager    User        @relation(fields: [managerId], references: [id])
+  modules    Module[]
+  timesheets Timesheet[]
 }
 
 model Module {
-  id        String   @id @default(cuid())
-  name      String   @unique        // ← make unique for upsert
+  id        String  @id @default(cuid())
+  name      String  @unique // ← make unique for upsert
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
+  project   Project @relation(fields: [projectId], references: [id])
 
   tasks     Task[]
   createdAt DateTime @default(now())
@@ -179,21 +180,21 @@ model Module {
 }
 
 model Task {
-  id            String       @id @default(cuid())
-  name          String       @unique        // ← make unique for upsert
-  description   String?
-  priority      TaskPriority @default(MEDIUM)
-  allocatedHrs  Int
-  status        TaskStatus   @default(PENDING)
+  id           String       @id @default(cuid())
+  name         String       @unique // ← make unique for upsert
+  description  String?
+  priority     TaskPriority @default(MEDIUM)
+  allocatedHrs Int
+  status       TaskStatus   @default(PENDING)
 
-  moduleId      String
-  module        Module       @relation(fields: [moduleId], references: [id])
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id])
 
-  assignedToId  String
-  assignedTo    User         @relation("UserTasks", fields: [assignedToId], references: [id])
-
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @default(now()) @updatedAt
+  assignedToId String
+  assignedTo   User        @relation("UserTasks", fields: [assignedToId], references: [id])
+  timesheets   Timesheet[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
 }
 
 enum TaskStatus {
@@ -210,7 +211,30 @@ enum TaskPriority {
   CRITICAL
 }
 
+model Timesheet {
+  id          String   @id @default(cuid())
+  userId      String
+  projectId   String
+  taskId      String?
+  date        DateTime // the day hours were logged
+  hoursWorked Float    @default(0)
+  description String?
 
+  status TimesheetStatus @default(PENDING)
+  comments    String? 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  task    Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+enum TimesheetStatus {
+  PENDING
+  COMPLETED
+  IN_PROGRESS
+}
 
 model Setting {
   id           String   @id @default(cuid())

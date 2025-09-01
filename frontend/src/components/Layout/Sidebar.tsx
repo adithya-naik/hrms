@@ -34,6 +34,9 @@ const navigation = [
   { name: "My Tasks", href: "/app/my-tasks", icon: FileText, roles: ["EMPLOYEE"] },     // ✅ Employee side
   { name: "My Profile", href: "/app/me", icon: User, roles: ["EMPLOYEE", "MANAGER", "HR", "ADMIN"] },
   { name: "Notifications", href: "/app/notifications", icon: Bell, roles: ["EMPLOYEE", "MANAGER", "HR"] },
+  { name: "Timesheet", href: "/app/timesheet", icon: FileText, roles: ["EMPLOYEE"] },
+  { name: "Employee Timesheet", href: "/app/timesheet-manager", icon: FileText, roles: ["MANAGER"] },
+  { name: "Employee Timesheet", href: "/app/timesheet-hr", icon: FileText, roles: ["HR"] },
 ];
 
 
