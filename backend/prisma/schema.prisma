@@ -83,6 +83,8 @@ model Leave {
   leaveType        LeaveType
   startDate        DateTime
   endDate          DateTime
+  startDayType DayType @default(FULL)
+  endDayType   DayType @default(FULL)
   totalDays        Float
   reason           String
   status           LeaveStatus      @default(PENDING)
@@ -90,11 +92,11 @@ model Leave {
   approvedDate     DateTime?
   rejectionReason  String?
   attachments      String[]         @default([])
-  isHalfDay        Boolean          @default(false)
-  emergencyLeave   Boolean          @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   isLOP            Boolean          @default(false)
+  isHalfDay   Boolean?  @default(false)
+
   leavePolicyId    String?
   lastReminderSent DateTime?
   dayStatuses      LeaveDayStatus[]
@@ -293,7 +295,6 @@ enum UserRole {
 enum LeaveType {
   SICK
   CASUAL
-  WFH
   LOP
 }
 
@@ -303,6 +304,12 @@ enum LeaveStatus {
   REJECTED
   CANCELLED
   PARTIAL
+}
+
+enum DayType {
+  FULL
+  FIRST_HALF
+  SECOND_HALF
 }
 
 enum AuditAction {
