@@ -20,100 +20,106 @@ interface LeaveBalanceCardsProps {
   balances: LeaveBalance[];
 }
 
-export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
-  const getLeaveTypeIcon = (type: string) => {
-    switch (type) {
-      case 'SICK':
-        return <Calendar className="h-4 w-4 text-red-500" />;
-      case 'CASUAL':
-        return <Clock className="h-4 w-4 text-blue-500" />;
-      case 'VACATION':
-      case 'WFH':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      default:
-        return <Calendar className="h-4 w-4 text-gray-500" />;
-    }
-  };
+const getLeaveTypeColor = (type: string) => {
+  switch (type) {
+    case 'SICK':
+      return 'bg-red-500';
+    case 'CASUAL':
+      return 'bg-blue-500';
+    case 'VACATION':
+      return 'bg-green-500';
+    case 'WFH':
+      return 'bg-purple-500';
+    default:
+      return 'bg-gray-500';
+  }
+};
 
-  const formatLeaveType = (type: string) =>
-    type ? type.replace('_', ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()) : '';
+const formatLeaveType = (type: string) =>
+  type ? type.replace('_', ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()) : '';
+
+export function LeaveBalanceCards({ balances }: LeaveBalanceCardsProps) {
+  // Calculate available days for each leave type
+  const leaveTypeData = balances.map(balance => {
+    const monthlyTotal = balance.leavePolicy?.monthlyQuota || balance.monthlyQuota || Math.ceil(balance.totalQuota / 12);
+    const monthlyUsed = balance.usedDays;
+    const monthlyAvailable = Math.max(0, monthlyTotal - monthlyUsed);
+    
+    return {
+      type: balance.leavePolicy?.leaveType || balance.leaveType,
+      total: monthlyTotal,
+      used: monthlyUsed,
+      available: monthlyAvailable,
+      color: getLeaveTypeColor(balance.leavePolicy?.leaveType || balance.leaveType)
+    };
+  });
+  
+  // Filter out leave types with zero total quota to avoid division by zero
+  const validLeaveTypes = leaveTypeData.filter(leave => leave.total > 0);
+  
+  // Calculate total available leaves across all types
+  const totalAvailable = validLeaveTypes.reduce((sum, leave) => sum + leave.available, 0);
+  
+  // Calculate percentages based on remaining leaves
+  const leaveSegments = validLeaveTypes.map(leave => ({
+    ...leave,
+    percentage: totalAvailable > 0 ? (leave.available / totalAvailable) * 100 : 0,
+    usedPercentage: leave.total > 0 ? (leave.used / leave.total) * 100 : 0
+  }));
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {balances?.map((balance) => {
-        // Use monthly quota for display; fallback to annual/12 if missing
-        const monthlyTotal = balance.leavePolicy?.monthlyQuota || balance.monthlyQuota || Math.ceil(balance.totalQuota / 12);
-        const monthlyUsed = balance.usedDays;
-        const monthlyPending = balance.pendingDays;
-        const monthlyAvailable = monthlyTotal - monthlyUsed;
-
-        const percentageAvailable = Math.round((monthlyAvailable / monthlyTotal) * 100);
-
-        // Dynamic color based on availability
-        let progressColor = 'green-500';
-        if (percentageAvailable <= 25) progressColor = 'red-500';
-        else if (percentageAvailable <= 50) progressColor = 'yellow-500';
-
-        const radius = 28;
-        const circumference = 2 * Math.PI * radius;
-        const offset = circumference - (percentageAvailable / 100) * circumference;
-
-        return (
-          <Card
-            key={balance.id}
-            className="hover:shadow-md transition-shadow flex flex-col items-center justify-center p-3"
+    <div className="w-full space-y-3 px-4">
+      {/* Progress Bar */}
+      <div className="h-8 w-full rounded-full overflow-hidden flex bg-gray-200">
+        {leaveSegments.map((data, index) => (
+          <div 
+            key={index}
+            className={`h-full ${data.color} relative`}
+            style={{ width: `${data.percentage}%` }}
+            title={`${data.available} ${data.type} days remaining (${data.percentage.toFixed(1)}%)`}
           >
-            <CardHeader className="flex flex-col items-center space-y-1">
-              {getLeaveTypeIcon(balance.leavePolicy?.leaveType || balance.leaveType)}
-              <CardTitle className="text-xs font-medium text-center">
-                {formatLeaveType(balance.leavePolicy?.leaveType || balance.leaveType)}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="flex flex-col items-center">
-              <div className="relative w-16 h-16">
-                <svg className="w-full h-full transform -rotate-90" aria-label={`${monthlyAvailable} of ${monthlyTotal} days available`}>
-                  <circle
-                    className="text-muted stroke-current"
-                    strokeWidth="5"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r={radius}
-                    cx="50%"
-                    cy="50%"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={0}
-                  />
-                  <circle
-                    className={`stroke-current transition-all duration-500 text-${progressColor}`}
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r={radius}
-                    cx="50%"
-                    cy="50%"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={offset}
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-sm font-bold text-green-600">{monthlyUsed}</span>
-                  <span className="text-[10px] text-muted-foreground">/{monthlyTotal}</span>
-                </div>
-              </div>
-
-              {/* Used, Pending, Carry */}
-              <div className="mt-2 text-[11px] text-muted-foreground space-y-0.5 text-center">
-                <div>Used: {monthlyUsed}</div>
-                <div>Pending: {monthlyPending}</div>
-                {balance.carryForward > 0 && <div className="text-blue-600">Carry: {balance.carryForward}</div>}
-                <div>Annual: {balance.totalQuota}</div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+            {/* Optional: Show a subtle separator between segments */}
+            {index > 0 && (
+              <div className="absolute left-0 top-0 bottom-0 w-px bg-white/50"></div>
+            )}
+          </div>
+        ))}
+      </div>
+      
+      {/* Numbers below the bar - positioned absolutely to align with segments */}
+      <div className="relative w-full h-12">
+        {leaveSegments.map((data, index) => {
+          // Calculate left position based on previous segments' percentages
+          const left = leaveSegments
+            .slice(0, index)
+            .reduce((sum, segment) => sum + segment.percentage, 0);
+            
+          return (
+            <div 
+              key={index}
+              className="absolute top-0 text-center transform -translate-x-1/2"
+              style={{
+                left: `${left + (data.percentage / 2)}%`,
+                minWidth: '2.5rem',
+              }}
+            >
+              <div className="font-medium">{data.available}</div>
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Color legend */}
+      <div className="flex flex-wrap justify-center gap-4 mt-3">
+        {leaveSegments.map((data, index) => (
+          <div key={index} className="flex items-center space-x-1.5">
+            <div className={`w-3 h-3 rounded-full ${data.color}`}></div>
+            <span className="text-xs text-gray-600">
+              {formatLeaveType(data.type)}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

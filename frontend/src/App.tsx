@@ -27,7 +27,7 @@ import TaskManagement from '@/pages/TaskManagement';
 import TaskList from "@/pages/TaskList";
 import TimesheetEmployee from "@/pages/TimesheetEmployee";
 import TimesheetManager from './pages/timesheetManager';
-import TimesheetHR from './pages/TimesheetHr';
+import TimesheetHR from './pages/TimesheetHR';
 
 const queryClient = new QueryClient();
 const NotificationsSSEInitializer = () => {
